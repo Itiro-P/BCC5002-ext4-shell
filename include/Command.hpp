@@ -7,6 +7,11 @@
 
 namespace Command {
     /**
+     * @brief Estrutura para armazenar informações sobre os comandos disponíveis no shell.
+     */
+    extern std::vector<std::pair<std::string, std::string>> command_info;
+
+    /**
      * @brief Exibe informações da imagem e do sistema de arquivos.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
@@ -35,9 +40,11 @@ namespace Command {
 
     /**
      * @brief Lista o conteúdo do diretório atual.
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório a ser visualizado.
+     * Caso não seja fornecido um argumento, o conteúdo do diretório atual será listado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short ls();
+    short ls(const std::vector<std::string>& args);
 
     /**
      * @brief Testa se um `inode` está livre ou ocupado.

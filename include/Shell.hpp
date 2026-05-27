@@ -19,7 +19,7 @@ class Shell {
         {"cat",        [](const CommandArgs& args) { return Command::cat(args); }},
         {"attr",       [](const CommandArgs& args) { return Command::attr(args); }},
         {"cd",         [](const CommandArgs& args) { return Command::cd(args); }},
-        {"ls",         [](const CommandArgs& args) { return Command::ls(); }},
+        {"ls",         [](const CommandArgs& args) { return Command::ls(args); }},
         {"test_inode", [](const CommandArgs& args) { return Command::test_inode(args); }},
         {"test_block", [](const CommandArgs& args) { return Command::test_block(args); }},
         {"cp",         [](const CommandArgs& args) { return Command::cp(args); }},
@@ -33,7 +33,6 @@ class Shell {
         {"exit",       [](const CommandArgs& args) { return Command::exit(); }},
         {"clear",      [](const CommandArgs& args) { return Command::clear(); }}
     };
-
 
     /** 
      * @brief Imprime o prompt do shell. 
