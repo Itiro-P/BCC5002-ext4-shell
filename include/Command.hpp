@@ -7,48 +7,60 @@
 namespace Command {
     /**
      * @brief Exibe informações da imagem e do sistema de arquivos.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void info();
+    short info();
 
     /**
      * @brief Exibe o conteúdo de um arquivo no formato texto.
      * 
      * @param file_path O caminho do arquivo a ser exibido.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void cat(const std::string& file_path);
+    short cat(const std::string& file_path);
 
     /**
      * @brief Exibe os atributos de um arquivo ou diretório.
      * 
      * @param path O caminho do arquivo ou diretório para o qual os atributos serão exibidos.
      */
-    void attr(const std::string& path);
+    short attr(const std::string& path);
 
     /**
      * @brief Muda o diretório atual para o especificado.
      * 
      * @param path O caminho do diretório para o qual o diretório atual será mudado.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void cd(const std::string& path);
+    short cd(const std::string& path);
 
     /**
      * @brief Lista o conteúdo do diretório atual.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void ls();
+    short ls();
 
     /**
      * @brief Testa se um `inode` está livre ou ocupado.
      * 
      * @param inode_number O número do inode a ser testado.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void test_inode(const uint32_t inode_number);
+    short test_inode(const uint32_t inode_number);
 
     /**
      * @brief Testa se um `bloco` está livre ou ocupado.
      * 
      * @param block_number O número do bloco a ser testado.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void test_block(const uint32_t block_number);
+    short test_block(const uint32_t block_number);
 
     /**
      * @brief Copia um arquivo para outro local.
@@ -57,52 +69,68 @@ namespace Command {
      * 
      * @param source_path O caminho do arquivo de origem.
      * @param target_path O caminho do arquivo de destino.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void cp(const std::string& source_path, const std::string& target_path);
+    short cp(const std::string& source_path, const std::string& target_path);
     
     /**
      * @brief Exibe o diretório atual.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void pwd();
+    short pwd();
 
     /**
      * @brief Cria um arquivo vazio.
      * 
      * @param file_path O caminho do arquivo a ser criado.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void touch(const std::string& file_path);
+    short touch(const std::string& file_path);
 
     /**
      * @brief Cria um diretório.
      * 
      * @param path O caminho do diretório a ser criado.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void mkdir(const std::string& path);
+    short mkdir(const std::string& path);
 
     /**
      * @brief Remove um arquivo.
      * 
      * @param file_path O caminho do arquivo a ser removido.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void rm(const std::string& file_path);
+    short rm(const std::string& file_path);
 
     /**
      * @brief Remove um diretório vazio.
      * 
      * @param path O caminho do diretório a ser removido. Deve estar vazio.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void rmdir(const std::string& path);
+    short rmdir(const std::string& path);
 
     /**
      * @brief Renomeia um arquivo.
      * 
      * @param file O caminho do arquivo a ser renomeado.
      * @param new_file_name O novo nome do arquivo.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void rename(const std::string& file, const std::string& new_file_name);
+    short rename(const std::string& file, const std::string& new_file_name);
 
     /**
      * @brief Sai do programa.
+     * 
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    void exit();
+    short exit();
 }
