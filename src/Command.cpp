@@ -55,3 +55,7 @@ void Command::rmdir(const std::string& path) {
 void Command::rename(const std::string& file, const std::string& new_file_name) {
 
 }
+
+void Command::exit() {
+
+}

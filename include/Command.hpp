@@ -100,4 +100,9 @@ namespace Command {
      * @param new_file_name O novo nome do arquivo.
      */
     void rename(const std::string& file, const std::string& new_file_name);
+
+    /**
+     * @brief Sai do programa.
+     */
+    void exit();
 }
