@@ -3,134 +3,114 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <print>
 
 namespace Command {
     /**
      * @brief Exibe informações da imagem e do sistema de arquivos.
-     * 
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
     short info();
 
     /**
      * @brief Exibe o conteúdo de um arquivo no formato texto.
-     * 
-     * @param file_path O caminho do arquivo a ser exibido.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser exibido.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short cat(const std::string& file_path);
+    short cat(const std::vector<std::string>& args);
 
     /**
      * @brief Exibe os atributos de um arquivo ou diretório.
-     * 
-     * @param path O caminho do arquivo ou diretório para o qual os atributos serão exibidos.
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo/diretório alvo.
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short attr(const std::string& path);
+    short attr(const std::vector<std::string>& args);
 
     /**
      * @brief Muda o diretório atual para o especificado.
-     * 
-     * @param path O caminho do diretório para o qual o diretório atual será mudado.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório destino.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short cd(const std::string& path);
+    short cd(const std::vector<std::string>& args);
 
     /**
      * @brief Lista o conteúdo do diretório atual.
-     * 
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
     short ls();
 
     /**
      * @brief Testa se um `inode` está livre ou ocupado.
-     * 
-     * @param inode_number O número do inode a ser testado.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o número do inode (em formato string) a ser testado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short test_inode(const uint32_t inode_number);
+    short test_inode(const std::vector<std::string>& args);
 
     /**
      * @brief Testa se um `bloco` está livre ou ocupado.
-     * 
-     * @param block_number O número do bloco a ser testado.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o número do bloco (em formato string) a ser testado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short test_block(const uint32_t block_number);
+    short test_block(const std::vector<std::string>& args);
 
     /**
      * @brief Copia um arquivo para outro local.
-     * 
      * Na especificação do trabalho, o nome do comando deveria ser `export`. Mas, ao menos no `C++23`, `export` é uma palavra reservada, então o nome do comando foi alterado para `cp`.
-     * 
-     * @param source_path O caminho do arquivo de origem.
-     * @param target_path O caminho do arquivo de destino.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` é o caminho do arquivo de origem e `args[2]` é o caminho do destino.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short cp(const std::string& source_path, const std::string& target_path);
+    short cp(const std::vector<std::string>& args);
     
     /**
      * @brief Exibe o diretório atual.
-     * 
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
     short pwd();
 
     /**
      * @brief Cria um arquivo vazio.
-     * 
-     * @param file_path O caminho do arquivo a ser criado.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser criado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short touch(const std::string& file_path);
+    short touch(const std::vector<std::string>& args);
 
     /**
      * @brief Cria um diretório.
-     * 
-     * @param path O caminho do diretório a ser criado.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório a ser criado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short mkdir(const std::string& path);
+    short mkdir(const std::vector<std::string>& args);
 
     /**
      * @brief Remove um arquivo.
-     * 
-     * @param file_path O caminho do arquivo a ser removido.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser removido.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short rm(const std::string& file_path);
+    short rm(const std::vector<std::string>& args);
 
     /**
      * @brief Remove um diretório vazio.
-     * 
-     * @param path O caminho do diretório a ser removido. Deve estar vazio.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório a ser removido (que deve estar vazio).
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short rmdir(const std::string& path);
+    short rmdir(const std::vector<std::string>& args);
 
     /**
      * @brief Renomeia um arquivo.
-     * 
-     * @param file O caminho do arquivo a ser renomeado.
-     * @param new_file_name O novo nome do arquivo.
-     * 
+     * @param args O vetor de argumentos, onde `args[1]` é o caminho atual do arquivo e `args[2]` é o novo nome/caminho.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short rename(const std::string& file, const std::string& new_file_name);
+    short rename(const std::vector<std::string>& args);
 
     /**
      * @brief Sai do programa.
-     * 
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
     short exit();
+    
+    /**
+     * @brief Limpa o terminal.
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     */
+    short clear();
 }
