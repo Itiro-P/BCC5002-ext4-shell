@@ -27,5 +27,5 @@ short Shell::run(const std::string& image_path) {
         // E colocamos em um vetor de strings.
         std::ranges::to<std::vector>();
 
-    return 0;
+    return this->command_map[args[0]](args);
 }
