@@ -1,6 +1,6 @@
-#include <iostream>
+#include <print>
 
 int main() {
-    std::cout << "Hello, ext4 shell!\n";
+    std::print("Hello, ext4 shell!\n");
     return 0;
 }
