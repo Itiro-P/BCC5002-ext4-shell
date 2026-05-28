@@ -59,7 +59,6 @@ public:
 
     /**
      * @brief Roda o shell, aguardando por comandos do usuário.
-     * 
      * @returns Um código de saída indicando o resultado da execução do shell. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
     short run();
