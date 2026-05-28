@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 
     std::string image_path = argv[1];
 
-    Shell shell = Shell();
+    Shell shell = Shell(image_path);
 
-    return shell.run(image_path);
+    return shell.run();
 }

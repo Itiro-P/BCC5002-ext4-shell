@@ -3,7 +3,7 @@
 #include <vector>
 #include <ranges>
 
-short Shell::run(const std::string& image_path) {
+short Shell::run() {
     // Alguma maracutaia deve acontecer aqui para conseguirmos a imagem montada e o diretório atual.
     std::string current_directory = "/";
 
@@ -36,7 +36,7 @@ short Shell::run(const std::string& image_path) {
 
         // Adoro o C++
         if(auto it = command_map.find(args[0]); it != command_map.end()) {
-            exit_code = it->second(args);
+            exit_code = it->second(this->image, args);
         } else {
             std::println(std::cerr, "ext4shell: comando não encontrado: {}", args[0]);
         }

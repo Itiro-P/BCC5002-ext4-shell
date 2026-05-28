@@ -44,6 +44,7 @@ ext4shell
 build/
 Build/
 build-*/
+images_ext4/
 
 # CMake generated files
 CMakeFiles/

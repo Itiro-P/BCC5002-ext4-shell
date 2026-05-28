@@ -2,14 +2,18 @@
 #include <iostream>
 #include <charconv>
 
-short Command::info() {
+short Command::help() {
     for(const auto& [cmd, desc] : Command::command_info) {
         std::println("- {:<32} - {}", cmd, desc);
     }
     return 0;
 }
 
-short Command::cat(const std::vector<std::string>& args) {
+short Command::info(Ext4Image& img) {
+    return 0;
+}
+
+short Command::cat(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if(file_path.empty()) {
@@ -20,7 +24,7 @@ short Command::cat(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::attr(const std::vector<std::string>& args) {
+short Command::attr(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if(target_path.empty()) {
@@ -31,7 +35,7 @@ short Command::attr(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::cd(const std::vector<std::string>& args) {
+short Command::cd(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if(target_path.empty()) {
@@ -42,7 +46,7 @@ short Command::cd(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::ls(const std::vector<std::string>& args) {
+short Command::ls(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if(target_path.empty()) {
@@ -54,7 +58,7 @@ short Command::ls(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::test_inode(const std::vector<std::string>& args) {
+short Command::test_inode(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string inode_str = args.size() > 1 ? args[1] : "";
 
     if(inode_str.empty()) {
@@ -80,7 +84,7 @@ short Command::test_inode(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::test_block(const std::vector<std::string>& args) {
+short Command::test_block(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string block_str = args.size() > 1 ? args[1] : "";
 
     if(block_str.empty()) {
@@ -106,7 +110,7 @@ short Command::test_block(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::cp(const std::vector<std::string>& args) {
+short Command::cp(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string source_path = args.size() > 1 ? args[1] : "";
     const std::string dest_path = args.size() > 2 ? args[2] : "";
 
@@ -118,11 +122,11 @@ short Command::cp(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::pwd() {
+short Command::pwd(Ext4Image& img) {
     return 0;
 }
 
-short Command::touch(const std::vector<std::string>& args) {
+short Command::touch(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if(file_path.empty()) {
@@ -133,7 +137,7 @@ short Command::touch(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::mkdir(const std::vector<std::string>& args) {
+short Command::mkdir(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
     if(dir_path.empty()) {
@@ -144,7 +148,7 @@ short Command::mkdir(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::rm(const std::vector<std::string>& args) {
+short Command::rm(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if(file_path.empty()) {
@@ -155,7 +159,7 @@ short Command::rm(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::rmdir(const std::vector<std::string>& args) {
+short Command::rmdir(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
     if(dir_path.empty()) {
@@ -166,7 +170,7 @@ short Command::rmdir(const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::rename(const std::vector<std::string>& args) {
+short Command::rename(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string file = args.size() > 1 ? args[1] : "";
     const std::string new_file_name = args.size() > 2 ? args[2] : "";
 
