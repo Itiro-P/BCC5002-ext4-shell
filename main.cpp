@@ -12,7 +12,12 @@ int main(int argc, char* argv[]) {
 
     std::string image_path = argv[1];
 
-    Shell shell = Shell(image_path);
+    try {
+        Shell shell = Shell(image_path);
 
-    return shell.run();
+        return shell.run();
+    } catch (const std::exception& e) {
+        std::println(std::cerr, "Erro ao inicializar a imagem: {}", e.what());
+        return 1;
+    }
 }
