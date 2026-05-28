@@ -3,6 +3,7 @@
 #include <string>
 #include <print>
 #include <unordered_map>
+#include <unordered_set>
 #include <functional>
 #include "Command.hpp"
 
@@ -13,6 +14,8 @@ typedef std::vector<std::string> CommandArgs;
  * @brief Classe responsável por representar a interface de linha de comando do shell.
  */
 class Shell {
+    // Comandos para saida do shell.
+    static inline std::unordered_set<std::string> exit_commands{"exit", "quit", "\\q"};
     // Hash de comandos com suas respectivas funções.
     static inline std::unordered_map<std::string, std::function<short(const CommandArgs&)>> command_map{ 
         {"info",       [](const CommandArgs& args) { return Command::info(); }},
@@ -30,9 +33,6 @@ class Shell {
         {"rm",         [](const CommandArgs& args) { return Command::rm(args); }},
         {"rmdir",      [](const CommandArgs& args) { return Command::rmdir(args); }},
         {"rename",     [](const CommandArgs& args) { return Command::rename(args); }},
-        {"exit",       [](const CommandArgs& args) { return Command::exit(); }},
-        {"quit",       [](const CommandArgs& args) { return Command::exit(); }},
-        {"\q",         [](const CommandArgs& args) { return Command::exit(); }},
         {"clear",      [](const CommandArgs& args) { return Command::clear(); }}
     };
 

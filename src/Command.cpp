@@ -1,25 +1,6 @@
 #include "../include/Command.hpp"
 #include <iostream>
 
-static constexpr std::array<std::pair<std::string_view, std::string_view>, 16> Command::command_info{{
-    {"info",                            "Exibe informações da imagem e do sistema de arquivos."},
-    {"cat <arquivo>",                   "Exibe o conteúdo de um arquivo no formato texto."},
-    {"attr <arquivo/diretório>",        "Exibe os atributos de um arquivo ou diretório."},
-    {"cd <diretório>",                  "Muda o diretório atual para o especificado."},
-    {"ls <diretório>",                  "Lista o conteúdo do diretório atual ou o especificado (caso <diretório> seja fornecido)."},
-    {"test_inode <inode>",              "Testa se um `inode` está livre ou ocupado."},
-    {"test_block <bloco>",              "Testa se um `bloco` está livre ou ocupado."},
-    {"cp/export <arquivo1> <arquivo2>", "Copia um arquivo para outro local."},
-    {"pwd",                             "Exibe o caminho do diretório atual."},
-    {"touch <arquivo>",                 "Cria um novo arquivo vazio ou atualiza a data de modificação de um arquivo existente."},
-    {"mkdir <diretório>",               "Cria um novo diretório."},
-    {"rm <arquivo>",                    "Remove um arquivo."},
-    {"rmdir <diretório>",               "Remove um diretório vazio."},
-    {"rename <arquivo> <novo nome>",    "Renomeia um arquivo ou diretório."},
-    {"exit",                            "Encerra o shell."},
-    {"clear",                           "Limpa a tela do shell."}
-}};
-
 short Command::info() {
     for(const auto& [cmd, desc] : Command::command_info) {
         std::println("- {:<32} - {}", cmd, desc);
@@ -80,6 +61,19 @@ short Command::test_inode(const std::vector<std::string>& args) {
         return 1;
     }
 
+    try {
+        const int inode = std::stoi(inode_str);
+        // Faça sua mágica!
+
+
+    } catch(std::invalid_argument& e) {
+        std::println(std::cerr, "Erro: O argumento para testi deve ser um número inteiro representando o inode.");
+        return 1;
+    } catch(std::out_of_range& e) {
+        std::println(std::cerr, "Erro: O número do inode fornecido está fora do intervalo permitido (inteiro com sinal de 32 bits).");
+        return 1;
+    }
+
     return 0;
 }
 
@@ -88,6 +82,19 @@ short Command::test_block(const std::vector<std::string>& args) {
 
     if(block_str.empty()) {
         std::println(std::cerr, "Uso: test_block <bloco>");
+        return 1;
+    }
+
+    try {
+        const int block = std::stoi(block_str);
+        // Faça sua mágica!
+
+
+    } catch(std::invalid_argument& e) {
+        std::println(std::cerr, "Erro: O argumento para testb deve ser um número inteiro representando o bloco.");
+        return 1;
+    } catch(std::out_of_range& e) {
+        std::println(std::cerr, "Erro: O número do bloco fornecido está fora do intervalo permitido (inteiro com sinal de 32 bits).");
         return 1;
     }
 
@@ -107,7 +114,6 @@ short Command::cp(const std::vector<std::string>& args) {
 }
 
 short Command::pwd() {
-
     return 0;
 }
 
@@ -163,10 +169,6 @@ short Command::rename(const std::vector<std::string>& args) {
         std::println(std::cerr, "Uso: rename <arquivo> <novo nome do arquivo>");
         return 1;
     }
-    return 0;
-}
-
-short Command::exit() {
     return 0;
 }
 

@@ -32,7 +32,7 @@ short Shell::run(const std::string& image_path) {
 
         if(args.empty()) continue;
 
-        if(args[0] == "exit") break;  // sai limpo aqui
+        if(exit_commands.find(args[0]) != exit_commands.end()) break;  // sai limpo aqui
 
         // Adoro o C++
         if(auto it = command_map.find(args[0]); it != command_map.end()) {
