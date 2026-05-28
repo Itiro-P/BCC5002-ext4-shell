@@ -14,14 +14,14 @@ typedef std::vector<std::string> CommandArgs;
  */
 class Shell {
     // Hash de comandos com suas respectivas funções.
-    std::unordered_map<std::string, std::function<short(const CommandArgs&)>> command_map{
+    static inline std::unordered_map<std::string, std::function<short(const CommandArgs&)>> command_map{ 
         {"info",       [](const CommandArgs& args) { return Command::info(); }},
         {"cat",        [](const CommandArgs& args) { return Command::cat(args); }},
         {"attr",       [](const CommandArgs& args) { return Command::attr(args); }},
         {"cd",         [](const CommandArgs& args) { return Command::cd(args); }},
         {"ls",         [](const CommandArgs& args) { return Command::ls(args); }},
-        {"testi", [](const CommandArgs& args) { return Command::test_inode(args); }},
-        {"testb", [](const CommandArgs& args) { return Command::test_block(args); }},
+        {"testi",      [](const CommandArgs& args) { return Command::test_inode(args); }},
+        {"testb",      [](const CommandArgs& args) { return Command::test_block(args); }},
         {"cp",         [](const CommandArgs& args) { return Command::cp(args); }},
         {"export",     [](const CommandArgs& args) { return Command::cp(args); }},
         {"pwd",        [](const CommandArgs& args) { return Command::pwd(); }},

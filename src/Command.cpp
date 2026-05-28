@@ -1,7 +1,7 @@
 #include "../include/Command.hpp"
 #include <iostream>
 
-std::vector<std::pair<std::string, std::string>> Command::command_info{
+static constexpr std::array<std::pair<std::string_view, std::string_view>, 16> Command::command_info{{
     {"info",                            "Exibe informações da imagem e do sistema de arquivos."},
     {"cat <arquivo>",                   "Exibe o conteúdo de um arquivo no formato texto."},
     {"attr <arquivo/diretório>",        "Exibe os atributos de um arquivo ou diretório."},
@@ -18,7 +18,7 @@ std::vector<std::pair<std::string, std::string>> Command::command_info{
     {"rename <arquivo> <novo nome>",    "Renomeia um arquivo ou diretório."},
     {"exit",                            "Encerra o shell."},
     {"clear",                           "Limpa a tela do shell."}
-};
+}};
 
 short Command::info() {
     for(const auto& [cmd, desc] : Command::command_info) {

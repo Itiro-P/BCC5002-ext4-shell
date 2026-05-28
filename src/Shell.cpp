@@ -7,16 +7,17 @@ short Shell::run(const std::string& image_path) {
     // Alguma maracutaia deve acontecer aqui para conseguirmos a imagem montada e o diretório atual.
     std::string current_directory = "/";
 
-    std::string command = "-";
+    std::string line;
     short exit_code = 0;
-    while(command.compare("exit") != 0) {
+
+    while (true) {
         print_prompt(current_directory);
-        std::getline(std::cin, command);
+
+        if (!std::getline(std::cin, line)) break;  // EOF (Ctrl+D)
 
         // Usamos ranges para dividir a string de comando em argumentos, usando o espaço como delimitador.
-        // Colocamos a string alvo.
-        std::vector<std::string> args = command | 
-            // Usamos pipe com split para tokenizar por espaços.
+        // Colocamos a string alvo. em um std::string_view para evitar cópias desnecessárias, e depois transformamos cada argumento em std::string.
+        std::vector<std::string> args = line | 
             std::views::split(' ') | 
             // Eliminamos (filtramos) os argumentos vazios ou que contenham apenas espaços.
             std::views::filter([](auto&& arg) { 
@@ -28,20 +29,17 @@ short Shell::run(const std::string& image_path) {
             }) |
             // E colocamos em um vetor de strings.
             std::ranges::to<std::vector>();
-        
-        if(!args.empty()) {
-            auto it = this->command_map.find(args[0]);
 
-            if (it != this->command_map.end()) {
-                // Comando encontrado, pode executar com segurança
-                exit_code = it->second(args);
-            } else {
-                // Comando não encontrado
-                std::println(std::cerr, "ext4shell: comando não encontrado: {}", args[0]);
-            }
+        if(args.empty()) continue;
+
+        if(args[0] == "exit") break;  // sai limpo aqui
+
+        // Adoro o C++
+        if(auto it = command_map.find(args[0]); it != command_map.end()) {
+            exit_code = it->second(args);
+        } else {
+            std::println(std::cerr, "ext4shell: comando não encontrado: {}", args[0]);
         }
-
     }
-
     return exit_code;
 }

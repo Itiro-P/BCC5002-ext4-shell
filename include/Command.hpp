@@ -3,13 +3,14 @@
 #include <string>
 #include <cstdint>
 #include <vector>
+#include <array>
 #include <print>
 
 namespace Command {
     /**
      * @brief Estrutura para armazenar informações sobre os comandos disponíveis no shell.
      */
-    extern std::vector<std::pair<std::string, std::string>> command_info;
+    extern std::array<std::pair<std::string, std::string>, 15> command_info;
 
     /**
      * @brief Exibe informações da imagem e do sistema de arquivos.
