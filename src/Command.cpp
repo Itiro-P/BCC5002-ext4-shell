@@ -64,8 +64,9 @@ short Command::ls(const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if(target_path.empty()) {
-        std::println(std::cerr, "Uso: ls <diretório>");
-        return 1;
+        // Listar o diretório atual
+    } else {
+        // Listar o diretório especificado
     }
 
     return 0;
