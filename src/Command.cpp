@@ -9,11 +9,11 @@ short Command::help() {
     return 0;
 }
 
-short Command::info(Ext4::Image& img) {
+short Command::info(Ext4Image& img) {
     return 0;
 }
 
-short Command::cat(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::cat(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if(file_path.empty()) {
@@ -24,7 +24,7 @@ short Command::cat(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::attr(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::attr(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if(target_path.empty()) {
@@ -35,7 +35,7 @@ short Command::attr(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::cd(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::cd(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if(target_path.empty()) {
@@ -46,7 +46,7 @@ short Command::cd(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::ls(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::ls(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if(target_path.empty()) {
@@ -58,7 +58,7 @@ short Command::ls(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::test_inode(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::test_inode(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string inode_str = args.size() > 1 ? args[1] : "";
 
     if(inode_str.empty()) {
@@ -84,7 +84,7 @@ short Command::test_inode(Ext4::Image& img, const std::vector<std::string>& args
     return 0;
 }
 
-short Command::test_block(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::test_block(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string block_str = args.size() > 1 ? args[1] : "";
 
     if(block_str.empty()) {
@@ -110,7 +110,7 @@ short Command::test_block(Ext4::Image& img, const std::vector<std::string>& args
     return 0;
 }
 
-short Command::cp(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::cp(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string source_path = args.size() > 1 ? args[1] : "";
     const std::string dest_path = args.size() > 2 ? args[2] : "";
 
@@ -122,11 +122,11 @@ short Command::cp(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::pwd(Ext4::Image& img) {
+short Command::pwd(Ext4Image& img) {
     return 0;
 }
 
-short Command::touch(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::touch(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if(file_path.empty()) {
@@ -137,7 +137,7 @@ short Command::touch(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::mkdir(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::mkdir(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
     if(dir_path.empty()) {
@@ -148,7 +148,7 @@ short Command::mkdir(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::rm(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::rm(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if(file_path.empty()) {
@@ -159,7 +159,7 @@ short Command::rm(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::rmdir(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::rmdir(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
     if(dir_path.empty()) {
@@ -170,7 +170,7 @@ short Command::rmdir(Ext4::Image& img, const std::vector<std::string>& args) {
     return 0;
 }
 
-short Command::rename(Ext4::Image& img, const std::vector<std::string>& args) {
+short Command::rename(Ext4Image& img, const std::vector<std::string>& args) {
     const std::string file = args.size() > 1 ? args[1] : "";
     const std::string new_file_name = args.size() > 2 ? args[2] : "";
 
