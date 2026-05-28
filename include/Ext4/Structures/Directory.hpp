@@ -21,7 +21,6 @@ namespace Ext4::Structures {
     };
 
     #pragma pack(push, 1)
-
     /**
      * @brief Entrada de diretório linear clássica/moderna v2 (struct ext4_dir_entry_2).
      * Esta estrutura possui tamanho variável em disco baseado no campo rec_len.
@@ -34,7 +33,9 @@ namespace Ext4::Structures {
         uint8_t  file_type;    // Tipo do ficheiro mapeado (Ver mapeamento em DirectoryFileType).
         // O nome do arquivo segue em linha na memória: char name[name_len]
     };
+    #pragma pack(pop)
 
+    #pragma pack(push, 1)
     /**
      * @brief Informações de controlo da raiz de indexação HTree (struct dx_root_info).
      * Presente apenas se o Inode do diretório possuir a flag EXT4_INDEX_FL ativa.
@@ -47,7 +48,9 @@ namespace Ext4::Structures {
         uint8_t  indirect_levels; // Quantidade de níveis de indireção/profundidade da árvore (Nível máximo: 2 ou 3).
         uint8_t  unused_flags;    // Flags operacionais não utilizadas.
     };
+    #pragma pack(pop)
 
+    #pragma pack(push, 1)
     /**
      * @brief Entrada individual de indexação por hash dentro da árvore HTree (struct dx_entry).
      * Mapeia uma chave hash ao bloco do diretório que armazena os nomes correspondentes.
@@ -56,7 +59,9 @@ namespace Ext4::Structures {
         uint32_t hash;            // O valor de hash calculado com base no nome do ficheiro procurado.
         uint32_t block;           // Número do bloco do diretório que contém sub-hashes ou as entradas DirectoryEntry.
     };
-
+    #pragma pack(pop)
+    
+    #pragma pack(push, 1)
     /**
      * @brief Cauda de validação e integridade do bloco HTree (struct dx_tail).
      * Reside estritamente nos últimos 8 bytes do bloco indexado para verificação de corrupção.
@@ -65,7 +70,6 @@ namespace Ext4::Structures {
         uint32_t dt_reserved;     // Espaço reservado (Não utilizado, mas entra no cálculo do checksum).
         uint32_t dt_checksum;     // Valor do Checksum do bloco de diretório HTree inteiro (Calculado via CRC32c).
     };
-
     #pragma pack(pop)
 
     // Asserções estáticas para assegurar conformidade milimétrica com o layout do Kernel Linux

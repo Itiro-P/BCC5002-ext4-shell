@@ -14,7 +14,6 @@ namespace Ext4::Structures {
     }
 
     #pragma pack(push, 1)
-
     /**
      * @brief Cabeçalho do nó da árvore de extents (struct ext4_extent_header).
      * Mapeia o início da árvore. Se estiver no interior do Inode, ocupa os primeiros 12 bytes 
@@ -27,7 +26,9 @@ namespace Ext4::Structures {
         uint16_t eh_depth;      // Profundidade na árvore. (0 = Nó folha contendo dados reais, >0 = Nó interno de indexação).
         uint32_t eh_generation; // Geração da árvore de extents (Atualmente não utilizada pelo kernel, geralmente zero).
     };
+    #pragma pack(pop)
 
+    #pragma pack(push, 1)
     /**
      * @brief Nó Interno ou de Índice da árvore de extents (struct ext4_extent_idx).
      * Utilizado estritamente quando eh_depth > 0. Aponta para um bloco de metadados descendente na árvore.
@@ -46,7 +47,9 @@ namespace Ext4::Structures {
             return (static_cast<uint64_t>(ei_leaf_hi) << 32) | ei_leaf_lo; 
         }
     };
+    #pragma pack(pop)
 
+    #pragma pack(push, 1)
     /**
      * @brief Nó Folha contendo o mapeamento de blocos de dados (struct ext4_extent).
      * Utilizado estritamente quando eh_depth == 0. Mapeia um intervalo sequencial de blocos lógicos a físicos.
@@ -79,7 +82,9 @@ namespace Ext4::Structures {
             return (static_cast<uint64_t>(ee_start_hi) << 32) | ee_start_lo; 
         }
     };
+    #pragma pack(pop)
 
+    #pragma pack(push, 1)
     /**
      * @brief Cauda de verificação opcional para blocos de extents externos (struct ext4_extent_tail).
      * Fica posicionada estritamente no final de blocos de extents completos alocados fora do inode.

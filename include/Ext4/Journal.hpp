@@ -20,7 +20,9 @@ namespace Ext4::Journal {
         uint32_t    h_blocktype;     // Identificador do tipo de bloco (JournalBlockType)
         uint32_t    h_sequence;      // Número de sequência global da transação
     };
-    
+    #pragma pack(pop)
+
+    #pragma pack(push, 1)
     /**
      * @brief Estrutura do Superbloco do Journal (struct journal_superblock_t).
      * O JBD2 (Journaling Block Device v2) gerencia as transações de metadados do EXT4.

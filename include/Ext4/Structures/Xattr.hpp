@@ -28,7 +28,6 @@ namespace Ext4::Structures {
     };
 
     #pragma pack(push, 1)
-
     /**
      * @brief Cabeçalho do Bloco de Atributos Estendidos (struct ext4_xattr_header).
      * Ocupa os primeiros 32 bytes de um bloco de disco dedicado exclusivamente a armazenar xattrs.
@@ -41,7 +40,9 @@ namespace Ext4::Structures {
         uint32_t h_checksum;     // Checksum de integridade do bloco de atributos inteiro (Calculado via CRC32c).
         std::array<uint32_t, 3> h_reserved; // Espaço reservado para expansão futura (Deve ser preenchido com zeros).
     };
+    #pragma pack(pop)
 
+    #pragma pack(push, 1)
     /**
      * @brief Entrada de Chave de Atributo Estendido (struct ext4_xattr_entry).
      * Uma lista encadeada destas estruturas segue-se imediatamente após o cabeçalho XattrHeader.

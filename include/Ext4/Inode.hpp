@@ -68,13 +68,15 @@ namespace Ext4 {
         EXT4_FL_USER_VISIBLE     = 0x705BDFFF, // Máscara de flags visíveis pelo utilizador
         EXT4_FL_USER_MODIFIABLE  = 0x604BC0FF  // Máscara de flags modificáveis pelo utilizador
     };
+    
     #pragma pack(push, 1)
-
     // Estruturas dependentes do Sistema Operativo Criador (Mapeamento Linux)
     struct Osd1Linux {
         uint32_t l_i_version;       // Versão do Inode (ou parte superior do refcount de EA_INODE)
     };
+    #pragma pack(pop)
 
+    #pragma pack(push, 1)
     struct Osd2Linux {
         uint16_t l_i_blocks_high;   // 16 bits superiores do contador de blocos
         uint16_t l_i_file_acl_high; // 16 bits superiores do bloco de atributos estendidos (ACL)
@@ -83,7 +85,9 @@ namespace Ext4 {
         uint16_t l_i_checksum_lo;   // 16 bits inferiores do Checksum do inode
         uint16_t l_i_reserved;      // Espaço não utilizado
     };
+    #pragma pack(pop)
 
+    #pragma pack(push, 1)
     /**
      * @brief Estrutura correspondente ao nó de índice (struct ext4_inode) do Linux Kernel.
      * Mapeia os metadados físicos exatos de um ficheiro ou diretório no EXT4.

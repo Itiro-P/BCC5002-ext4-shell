@@ -51,6 +51,5 @@ namespace Ext4::Structures {
     #pragma pack(pop)
 
     // Asserção para garantir compatibilidade estrutural milimétrica com a tabela de descritores em disco
-    static_assert(sizeof(GroupDescriptor) == GroupDescriptorNS::SIZE, 
-                  "A estrutura GroupDescriptor deve ter exatamente 64 bytes!");
+    static_assert(sizeof(GroupDescriptor) == GroupDescriptorNS::SIZE, "A estrutura GroupDescriptor deve ter exatamente 64 bytes!");
 }
