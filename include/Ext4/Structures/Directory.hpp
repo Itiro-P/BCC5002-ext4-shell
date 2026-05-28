@@ -70,7 +70,7 @@ namespace Ext4::Structures {
 
     // Asserções estáticas para assegurar conformidade milimétrica com o layout do Kernel Linux
     static_assert(sizeof(DirectoryEntry) == 8, "A estrutura base DirectoryEntry deve medir exatamente 8 bytes!");
-    static_assert(sizeof(DxRootInfo)      == 8, "A estrutura DxRootInfo deve medir exatamente 8 bytes!");
-    static_assert(sizeof(DxEntry)         == 8, "A estrutura DxEntry deve medir exatamente 8 bytes!");
-    static_assert(sizeof(DxTail)          == 8, "A estrutura DxTail deve medir exatamente 8 bytes!");
+    static_assert(sizeof(DxRootInfo)     == 8, "A estrutura DxRootInfo deve medir exatamente 8 bytes!");
+    static_assert(sizeof(DxEntry)        == 8, "A estrutura DxEntry deve medir exatamente 8 bytes!");
+    static_assert(sizeof(DxTail)         == 8, "A estrutura DxTail deve medir exatamente 8 bytes!");
 }
