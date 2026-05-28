@@ -1,5 +1,6 @@
 #include "../include/Command.hpp"
 #include <iostream>
+#include <charconv>
 
 short Command::info() {
     for(const auto& [cmd, desc] : Command::command_info) {
@@ -57,22 +58,24 @@ short Command::test_inode(const std::vector<std::string>& args) {
     const std::string inode_str = args.size() > 1 ? args[1] : "";
 
     if(inode_str.empty()) {
-        std::println(std::cerr, "Uso: test_inode <inode>");
+        std::println(std::cerr, "Uso: testi <id do inode>");
         return 1;
     }
 
-    try {
-        const int inode = std::stoi(inode_str);
-        // Faça sua mágica!
+    // C++ (ainda) não tem um método como `std::stoi` para inteiro 32 bis sem sinal.
+    // Então usamos `std::from_chars`.
+    uint32_t inode_id{};
+    auto [ptr, ec] = std::from_chars(inode_str.data(), inode_str.data() + inode_str.size(), inode_id);
 
-
-    } catch(std::invalid_argument& e) {
+    if(ec == std::errc::invalid_argument) {
         std::println(std::cerr, "Erro: O argumento para testi deve ser um número inteiro representando o inode.");
         return 1;
-    } catch(std::out_of_range& e) {
-        std::println(std::cerr, "Erro: O número do inode fornecido está fora do intervalo permitido (inteiro com sinal de 32 bits).");
+    } else if(ec == std::errc::result_out_of_range) {
+        std::println(std::cerr, "Erro: O número do inode fornecido está fora do intervalo permitido (inteiro sem sinal de 32 bits).");
         return 1;
     }
+
+    // Faça sua mágica!
 
     return 0;
 }
@@ -81,22 +84,24 @@ short Command::test_block(const std::vector<std::string>& args) {
     const std::string block_str = args.size() > 1 ? args[1] : "";
 
     if(block_str.empty()) {
-        std::println(std::cerr, "Uso: test_block <bloco>");
+        std::println(std::cerr, "Uso: testb <id do bloco>");
         return 1;
     }
 
-    try {
-        const int block = std::stoi(block_str);
-        // Faça sua mágica!
+    // C++ (ainda) não tem um método como `std::stoi` para inteiro 32 bis sem sinal.
+    // Então usamos `std::from_chars`.
+    uint32_t block_id{};
+    auto [ptr, ec] = std::from_chars(block_str.data(), block_str.data() + block_str.size(), block_id);
 
-
-    } catch(std::invalid_argument& e) {
+    if(ec == std::errc::invalid_argument) {
         std::println(std::cerr, "Erro: O argumento para testb deve ser um número inteiro representando o bloco.");
         return 1;
-    } catch(std::out_of_range& e) {
-        std::println(std::cerr, "Erro: O número do bloco fornecido está fora do intervalo permitido (inteiro com sinal de 32 bits).");
+    } else if(ec == std::errc::result_out_of_range) {
+        std::println(std::cerr, "Erro: O número do bloco fornecido está fora do intervalo permitido (inteiro sem sinal de 32 bits).");
         return 1;
     }
+
+    // Faça sua mágica!
 
     return 0;
 }
