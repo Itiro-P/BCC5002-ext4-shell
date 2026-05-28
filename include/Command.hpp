@@ -7,6 +7,10 @@
 #include <array>
 #include <print>
 
+/**
+ * @brief Namespace que contém as definições dos comandos disponíveis no shell.
+ * @author Pedro Itiro Nagao
+ */
 namespace Command {
     /**
      * @brief Estrutura para armazenar informações sobre os comandos disponíveis no shell.

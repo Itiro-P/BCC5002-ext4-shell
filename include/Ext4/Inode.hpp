@@ -34,39 +34,39 @@ namespace Ext4 {
 
     // Flags aplicadas ao comportamento do Inode (i_flags)
     enum InodeFlags : uint32_t {
-        EXT4_SECRM_FL        = 0x00000001, // Eliminação segura exigida (não implementado)
-        EXT4_UNRM_FL         = 0x00000002, // Preservar para recuperação (não implementado)
-        EXT4_COMPR_FL        = 0x00000004, // Ficheiro comprimido (não totalmente implementado)
-        EXT4_SYNC_FL         = 0x00000008, // Escritas síncronas obrigatórias
-        EXT4_IMMUTABLE_FL    = 0x00000010, // Ficheiro imutável
-        EXT4_APPEND_FL       = 0x00000020, // Apenas permite escrita no final (Append)
-        EXT4_NODUMP_FL       = 0x00000040, // O utilitário dump(1) deve ignorar o ficheiro
-        EXT4_NOATIME_FL      = 0x00000080, // Não atualizar o tempo de acesso (atime)
-        EXT4_DIRTY_FL        = 0x00000100, // Ficheiro comprimido modificado (não usado)
-        EXT4_COMPRBLK_FL     = 0x00000200, // Possui blocos comprimidos (não usado)
-        EXT4_NOCOMPR_FL      = 0x00000400, // Não comprimir o ficheiro (não usado)
-        EXT4_ENCRYPT_FL      = 0x00000800, // Inode encriptado
-        EXT4_INDEX_FL        = 0x00001000, // Diretório possui índices indexados por hash (HTree)
-        EXT4_IMAGIC_FL       = 0x00002000, // Diretório mágico AFS
-        EXT4_JOURNAL_DATA_FL = 0x00004000, // Dados passam obrigatoriamente pelo Journal
-        EXT4_NOTAIL_FL       = 0x00008000, // O final do ficheiro não deve ser fundido (não usado)
-        EXT4_DIRSYNC_FL      = 0x00010000, // Alterações no diretório são síncronas
-        EXT4_TOPDIR_FL       = 0x00020000, // Topo da hierarquia de diretórios
-        EXT4_HUGE_FILE_FL    = 0x00040000, // Ficheiro gigante (escala os contadores de blocos)
-        EXT4_EXTENTS_FL      = 0x00080000, // O Inode utiliza árvore de extents (i_block armazena extents)
-        EXT4_VERITY_FL       = 0x00100000, // Ficheiro protegido por Verity
-        EXT4_EA_INODE_FL     = 0x00200000, // O Inode armazena um atributo estendido grande nos seus blocos
-        EXT4_EOFBLOCKS_FL    = 0x00400000, // Possui blocos alocados para lá do EOF (depreciado)
-        EXT4_SNAPFILE_FL     = 0x01000000, // Inode é um snapshot (fora do mainline)
+        EXT4_SECRM_FL            = 0x00000001, // Eliminação segura exigida (não implementado)
+        EXT4_UNRM_FL             = 0x00000002, // Preservar para recuperação (não implementado)
+        EXT4_COMPR_FL            = 0x00000004, // Ficheiro comprimido (não totalmente implementado)
+        EXT4_SYNC_FL             = 0x00000008, // Escritas síncronas obrigatórias
+        EXT4_IMMUTABLE_FL        = 0x00000010, // Ficheiro imutável
+        EXT4_APPEND_FL           = 0x00000020, // Apenas permite escrita no final (Append)
+        EXT4_NODUMP_FL           = 0x00000040, // O utilitário dump(1) deve ignorar o ficheiro
+        EXT4_NOATIME_FL          = 0x00000080, // Não atualizar o tempo de acesso (atime)
+        EXT4_DIRTY_FL            = 0x00000100, // Ficheiro comprimido modificado (não usado)
+        EXT4_COMPRBLK_FL         = 0x00000200, // Possui blocos comprimidos (não usado)
+        EXT4_NOCOMPR_FL          = 0x00000400, // Não comprimir o ficheiro (não usado)
+        EXT4_ENCRYPT_FL          = 0x00000800, // Inode encriptado
+        EXT4_INDEX_FL            = 0x00001000, // Diretório possui índices indexados por hash (HTree)
+        EXT4_IMAGIC_FL           = 0x00002000, // Diretório mágico AFS
+        EXT4_JOURNAL_DATA_FL     = 0x00004000, // Dados passam obrigatoriamente pelo Journal
+        EXT4_NOTAIL_FL           = 0x00008000, // O final do ficheiro não deve ser fundido (não usado)
+        EXT4_DIRSYNC_FL          = 0x00010000, // Alterações no diretório são síncronas
+        EXT4_TOPDIR_FL           = 0x00020000, // Topo da hierarquia de diretórios
+        EXT4_HUGE_FILE_FL        = 0x00040000, // Ficheiro gigante (escala os contadores de blocos)
+        EXT4_EXTENTS_FL          = 0x00080000, // O Inode utiliza árvore de extents (i_block armazena extents)
+        EXT4_VERITY_FL           = 0x00100000, // Ficheiro protegido por Verity
+        EXT4_EA_INODE_FL         = 0x00200000, // O Inode armazena um atributo estendido grande nos seus blocos
+        EXT4_EOFBLOCKS_FL        = 0x00400000, // Possui blocos alocados para lá do EOF (depreciado)
+        EXT4_SNAPFILE_FL         = 0x01000000, // Inode é um snapshot (fora do mainline)
         EXT4_SNAPFILE_DELETED_FL = 0x04000000, // Snapshot em remoção (fora do mainline)
         EXT4_SNAPFILE_SHRUNK_FL  = 0x08000000, // Redução de snapshot concluída (fora do mainline)
-        EXT4_INLINE_DATA_FL  = 0x10000000, // O Inode armazena dados embutidos diretamente em i_block
-        EXT4_PROJINHERIT_FL  = 0x20000000, // Subdiretórios herdam o mesmo ID de Projeto
-        EXT4_CASEFOLD_FL     = 0x40000000, // Diretório com buscas insensíveis a maiúsculas/minúsculas
-        EXT4_RESERVED_FL     = 0x80000000, // Reservado para a biblioteca ext4
+        EXT4_INLINE_DATA_FL      = 0x10000000, // O Inode armazena dados embutidos diretamente em i_block
+        EXT4_PROJINHERIT_FL      = 0x20000000, // Subdiretórios herdam o mesmo ID de Projeto
+        EXT4_CASEFOLD_FL         = 0x40000000, // Diretório com buscas insensíveis a maiúsculas/minúsculas
+        EXT4_RESERVED_FL         = 0x80000000, // Reservado para a biblioteca ext4
 
-        EXT4_FL_USER_VISIBLE    = 0x705BDFFF, // Máscara de flags visíveis pelo utilizador
-        EXT4_FL_USER_MODIFIABLE = 0x604BC0FF  // Máscara de flags modificáveis pelo utilizador
+        EXT4_FL_USER_VISIBLE     = 0x705BDFFF, // Máscara de flags visíveis pelo utilizador
+        EXT4_FL_USER_MODIFIABLE  = 0x604BC0FF  // Máscara de flags modificáveis pelo utilizador
     };
     #pragma pack(push, 1)
 
@@ -127,7 +127,6 @@ namespace Ext4 {
         uint32_t  i_version_hi;     // 32 bits superiores do número de versão do ficheiro
         uint32_t  i_projid;         // Identificador de Projeto (Quota de Projeto)
     };
-
     #pragma pack(pop)
 
     // Garante integridade do tamanho da especificação moderna completa (160 bytes)

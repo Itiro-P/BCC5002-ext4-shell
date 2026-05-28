@@ -13,6 +13,7 @@ typedef std::vector<std::string> CommandArgs;
 
 /**
  * @brief Classe responsável por representar a interface de linha de comando do shell.
+ * @author Pedro Itiro Nagao
  */
 class Shell {
     // Imagem que será carregada e manipulada pelos comandos do shell.

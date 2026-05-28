@@ -6,6 +6,10 @@
 #include "Ext4/Flags.hpp"
 #include "Ext4/Inode.hpp"
 
+/**
+ * @brief Namespace principal do projeto, contendo as definições de estruturas, classes e funções relacionadas ao sistema de arquivos EXT4.
+ * @author Pedro Itiro Nagao
+ */
 namespace Ext4 {
     using Structures::SuperBlock;
     using Structures::GroupDescriptor;

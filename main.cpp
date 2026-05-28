@@ -2,6 +2,10 @@
 #include <print>
 #include <iostream>
 
+/**
+ * @brief Ponto de entrada do programa, onde a imagem do sistema de arquivos EXT4 é carregada e o shell é iniciado.
+ * @author Pedro Itiro Nagao
+ */
 int main(int argc, char* argv[]) {
     if(argc <= 1) {
         std::println(std::cerr, "Uso: {} <imagem ext4>", argv[0]);
