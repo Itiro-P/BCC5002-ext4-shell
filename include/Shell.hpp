@@ -31,6 +31,8 @@ class Shell {
         {"rmdir",      [](const CommandArgs& args) { return Command::rmdir(args); }},
         {"rename",     [](const CommandArgs& args) { return Command::rename(args); }},
         {"exit",       [](const CommandArgs& args) { return Command::exit(); }},
+        {"quit",       [](const CommandArgs& args) { return Command::exit(); }},
+        {"\q",         [](const CommandArgs& args) { return Command::exit(); }},
         {"clear",      [](const CommandArgs& args) { return Command::clear(); }}
     };
 
