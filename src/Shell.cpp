@@ -8,6 +8,7 @@ short Shell::run() {
     std::string current_directory = "/";
 
     std::string line;
+
     short exit_code = 0;
 
     while (true) {
@@ -16,8 +17,9 @@ short Shell::run() {
         if (!std::getline(std::cin, line)) break;  // EOF (Ctrl+D)
 
         // Usamos ranges para dividir a string de comando em argumentos, usando o espaço como delimitador.
-        // Colocamos a string alvo. em um std::string_view para evitar cópias desnecessárias, e depois transformamos cada argumento em std::string.
+        // Colocamos a string alvo, em um std::string_view para evitar cópias desnecessárias, e depois transformamos cada argumento em std::string.
         std::vector<std::string> args = line | 
+            // Quebramos a linha em argumentos
             std::views::split(' ') | 
             // Eliminamos (filtramos) os argumentos vazios ou que contenham apenas espaços.
             std::views::filter([](auto&& arg) { 
@@ -32,10 +34,10 @@ short Shell::run() {
 
         if(args.empty()) continue;
 
-        if(exit_commands.find(args[0]) != exit_commands.end()) break;  // sai limpo aqui
+        if(this->exit_commands.find(args[0]) != this->exit_commands.end()) break;  // sai limpo aqui
 
         // Adoro o C++
-        if(auto it = command_map.find(args[0]); it != command_map.end()) {
+        if(auto it = this->command_map.find(args[0]); it != this->command_map.end()) {
             exit_code = it->second(this->image, args);
         } else {
             std::println(std::cerr, "ext4shell: comando não encontrado: {}", args[0]);

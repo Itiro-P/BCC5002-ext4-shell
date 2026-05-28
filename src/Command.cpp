@@ -10,6 +10,9 @@ short Command::help() {
 }
 
 short Command::info(Ext4Image& img) {
+
+    // necessário implementar
+
     return 0;
 }
 
@@ -20,6 +23,8 @@ short Command::cat(Ext4Image& img, const std::vector<std::string>& args) {
         std::println(std::cerr, "Uso: cat <arquivo>");
         return 1;
     }
+
+    // necessário implementar
 
     return 0;
 }
@@ -32,6 +37,8 @@ short Command::attr(Ext4Image& img, const std::vector<std::string>& args) {
         return 1;
     }
 
+    // necessário implementar
+
     return 0;
 }
 
@@ -42,6 +49,8 @@ short Command::cd(Ext4Image& img, const std::vector<std::string>& args) {
         std::println(std::cerr, "Uso: cd <diretório>");
         return 1;
     }
+    
+    // necessário implementar
 
     return 0;
 }
@@ -79,7 +88,7 @@ short Command::test_inode(Ext4Image& img, const std::vector<std::string>& args) 
         return 1;
     }
 
-    // Faça sua mágica!
+    // necessário implementar
 
     return 0;
 }
@@ -105,7 +114,7 @@ short Command::test_block(Ext4Image& img, const std::vector<std::string>& args) 
         return 1;
     }
 
-    // Faça sua mágica!
+    // necessário implementar
 
     return 0;
 }
@@ -119,10 +128,15 @@ short Command::cp(Ext4Image& img, const std::vector<std::string>& args) {
         return 1;
     }
 
+    // necessário implementar
+
     return 0;
 }
 
 short Command::pwd(Ext4Image& img) {
+
+    // necessário implementar
+
     return 0;
 }
 
@@ -133,6 +147,8 @@ short Command::touch(Ext4Image& img, const std::vector<std::string>& args) {
         std::println(std::cerr, "Uso: touch <arquivo>");
         return 1;
     }
+
+    // necessário implementar
 
     return 0;
 }
@@ -145,6 +161,8 @@ short Command::mkdir(Ext4Image& img, const std::vector<std::string>& args) {
         return 1;
     }
 
+    // necessário implementar
+
     return 0;
 }
 
@@ -155,6 +173,8 @@ short Command::rm(Ext4Image& img, const std::vector<std::string>& args) {
         std::println(std::cerr, "Uso: rm <arquivo>");
         return 1;
     }
+
+    // necessário implementar
 
     return 0;
 }
@@ -167,6 +187,8 @@ short Command::rmdir(Ext4Image& img, const std::vector<std::string>& args) {
         return 1;
     }
 
+    // necessário implementar
+
     return 0;
 }
 
@@ -178,11 +200,17 @@ short Command::rename(Ext4Image& img, const std::vector<std::string>& args) {
         std::println(std::cerr, "Uso: rename <arquivo> <novo nome do arquivo>");
         return 1;
     }
+
+    // necessário implementar
+
     return 0;
 }
 
 short Command::clear() {
     // Usamos CSI J 2 para limpar a tela e CSI H para mover o cursor para a posição inicial.
     std::print("\033[2J\033[H");
+
+    // necessário implementar
+
     return 0;
 }
