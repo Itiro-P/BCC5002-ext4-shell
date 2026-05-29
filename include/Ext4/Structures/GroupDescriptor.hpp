@@ -4,15 +4,6 @@
 #include <cstddef>
 
 namespace Ext4::Structures {
-
-    /**
-     * @brief Espaço de nomes dedicado a constantes dos descritores de grupo.
-     */
-    namespace GroupDescriptorNS {
-        // Tamanho físico em bytes de um descritor de grupo moderno de 64 bits (64 bytes).
-        static inline constexpr size_t SIZE = 64;
-    }
-
     #pragma pack(push, 1)
     /**
      * @brief Estrutura do Descritor de Grupo de Blocos (struct ext4_group_desc).
@@ -51,5 +42,5 @@ namespace Ext4::Structures {
     #pragma pack(pop)
 
     // Asserção para garantir compatibilidade estrutural milimétrica com a tabela de descritores em disco
-    static_assert(sizeof(GroupDescriptor) == GroupDescriptorNS::SIZE, "A estrutura GroupDescriptor deve ter exatamente 64 bytes!");
+    static_assert(sizeof(GroupDescriptor) == 64, "A estrutura GroupDescriptor deve ter exatamente 64 bytes!");
 }

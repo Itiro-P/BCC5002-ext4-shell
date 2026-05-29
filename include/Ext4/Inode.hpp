@@ -1,6 +1,6 @@
-#include "../Ext4.hpp"
+#pragma once
 
-namespace Ext4 {
+namespace Ext4::Inode {
     // Modo do arquivo e permissões (i_mode)
     enum InodeMode : uint16_t {
         // Permissões de Acesso
@@ -132,7 +132,30 @@ namespace Ext4 {
         uint32_t  i_projid;         // Identificador de Projeto (Quota de Projeto)
     };
     #pragma pack(pop)
-
     // Garante integridade do tamanho da especificação moderna completa (160 bytes)
     static_assert(sizeof(Inode) == 160, "O tamanho da estrutura básica do Inode deve ser de 160 bytes!");
+
+    /**
+     * @brief Encapsula um `Inode`. Operações de conveniência.
+     */
+    class InodeWrapper {
+    private:
+        // O número global do inode, começando em 2 para o diretório raiz.
+        uint32_t inode_id = 0;
+        // O inode encapsulado, contendo os metadados físicos do ficheiro ou diretório.
+        Inode inode{};
+
+    public:
+        InodeWrapper() = default;
+        
+        InodeWrapper(uint32_t id, const Inode& inode_data) 
+            : inode_id(id), inode(inode_data) {}
+
+        uint32_t get_inode_id() const { return this->inode_id; }
+        const Inode& get_inode() const { return this->inode; }
+
+        InodeMode get_type() const {
+            return static_cast<InodeMode>(this->inode.i_mode & S_IFMT);
+        }        
+    };
 }

@@ -9,7 +9,7 @@ namespace Ext4::Structures {
      * @brief Espaço de nomes dedicado a constantes globais de localização e identificação do Superbloco.
      */
     namespace SuperBlockNS {
-        // Número mágico universal que identifica um sistema de arquivos da família EXT (0xEF53).
+        // Número mágico universal que identifica um sistema de arquivos da família EXT (`0xEF53`).
         static inline constexpr uint16_t MAGIC = 0xEF53;
         
         // Deslocamento fixo (em bytes) a partir do início do disco/partição onde o Superbloco reside.

@@ -42,13 +42,41 @@ class Shell {
         {"clear",  [](Ext4::Image& img, const CommandArgs& args) { return Command::clear(); }}
     };
 
-    /** 
-     * @brief Imprime o prompt do shell. 
-     * @param current_directory O diretório atual a ser exibido no prompt.
-    */
-    void print_prompt(const std::string& current_directory) {
-        std::print("({})> ", current_directory);
+/** * @brief Imprime o prompt do shell com base no tipo do inode atual.
+ */
+void print_prompt() {
+    Ext4::InodeMode type = this->image.get_current_inode().get_type();
+    std::string_view type_str = "unknown";
+
+    switch (type) {
+        case Ext4::InodeMode::S_IFIFO:
+            type_str = "fifo";
+            break;
+        case Ext4::InodeMode::S_IFCHR:
+            type_str = "chr";
+            break;
+        case Ext4::InodeMode::S_IFDIR:
+            type_str = "dir";
+            break;
+        case Ext4::InodeMode::S_IFBLK:
+            type_str = "blk";
+            break;
+        case Ext4::InodeMode::S_IFREG:
+            type_str = "file";
+            break;
+        case Ext4::InodeMode::S_IFLNK:
+            type_str = "lnk";
+            break;
+        case Ext4::InodeMode::S_IFSOCK:
+            type_str = "sock";
+            break;
+        default:
+            type_str = "unknown";
+            break;
     }
+
+    std::print("({})> ", type_str);
+}
 
 public:
     /**

@@ -4,14 +4,11 @@
 #include <ranges>
 
 short Shell::run() {
-    // Alguma maracutaia deve acontecer aqui para conseguirmos a imagem montada e o diretório atual.
-    std::string current_directory = "/";
-
     std::string line;
     short exit_code = 0;
 
     while (true) {
-        print_prompt(current_directory);
+        print_prompt();
 
         if (!std::getline(std::cin, line)) break;  // EOF (Ctrl+D)
 
