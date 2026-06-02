@@ -16,7 +16,7 @@ short Command::info(Ext4::Image& img) {
 short Command::cat(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
-    if(file_path.empty()) {
+    if (file_path.empty()) {
         std::println(std::cerr, "Uso: cat <arquivo>");
         return 1;
     }
@@ -27,7 +27,7 @@ short Command::cat(Ext4::Image& img, const std::vector<std::string>& args) {
 short Command::attr(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
-    if(target_path.empty()) {
+    if (target_path.empty()) {
         std::println(std::cerr, "Uso: attr <arquivo/diretório>");
         return 1;
     }
@@ -38,7 +38,7 @@ short Command::attr(Ext4::Image& img, const std::vector<std::string>& args) {
 short Command::cd(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
-    if(target_path.empty()) {
+    if (target_path.empty()) {
         std::println(std::cerr, "Uso: cd <diretório>");
         return 1;
     }
@@ -49,7 +49,7 @@ short Command::cd(Ext4::Image& img, const std::vector<std::string>& args) {
 short Command::ls(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
-    if(target_path.empty()) {
+    if (target_path.empty()) {
         // Listar o diretório atual
     } else {
         // Listar o diretório especificado
@@ -61,7 +61,7 @@ short Command::ls(Ext4::Image& img, const std::vector<std::string>& args) {
 short Command::test_inode(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string inode_str = args.size() > 1 ? args[1] : "";
 
-    if(inode_str.empty()) {
+    if (inode_str.empty()) {
         std::println(std::cerr, "Uso: testi <id do inode>");
         return 1;
     }
@@ -71,10 +71,10 @@ short Command::test_inode(Ext4::Image& img, const std::vector<std::string>& args
     uint32_t inode_id{};
     auto [ptr, ec] = std::from_chars(inode_str.data(), inode_str.data() + inode_str.size(), inode_id);
 
-    if(ec == std::errc::invalid_argument) {
+    if (ec == std::errc::invalid_argument) {
         std::println(std::cerr, "Erro: O argumento para testi deve ser um número inteiro representando o inode.");
         return 1;
-    } else if(ec == std::errc::result_out_of_range) {
+    } else if (ec == std::errc::result_out_of_range) {
         std::println(std::cerr, "Erro: O número do inode fornecido está fora do intervalo permitido (inteiro sem sinal de 32 bits).");
         return 1;
     }
@@ -87,7 +87,7 @@ short Command::test_inode(Ext4::Image& img, const std::vector<std::string>& args
 short Command::test_block(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string block_str = args.size() > 1 ? args[1] : "";
 
-    if(block_str.empty()) {
+    if (block_str.empty()) {
         std::println(std::cerr, "Uso: testb <id do bloco>");
         return 1;
     }
@@ -97,10 +97,10 @@ short Command::test_block(Ext4::Image& img, const std::vector<std::string>& args
     uint32_t block_id{};
     auto [ptr, ec] = std::from_chars(block_str.data(), block_str.data() + block_str.size(), block_id);
 
-    if(ec == std::errc::invalid_argument) {
+    if (ec == std::errc::invalid_argument) {
         std::println(std::cerr, "Erro: O argumento para testb deve ser um número inteiro representando o bloco.");
         return 1;
-    } else if(ec == std::errc::result_out_of_range) {
+    } else if (ec == std::errc::result_out_of_range) {
         std::println(std::cerr, "Erro: O número do bloco fornecido está fora do intervalo permitido (inteiro sem sinal de 32 bits).");
         return 1;
     }
@@ -114,7 +114,7 @@ short Command::cp(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string source_path = args.size() > 1 ? args[1] : "";
     const std::string dest_path = args.size() > 2 ? args[2] : "";
 
-    if(source_path.empty() || dest_path.empty()) {
+    if (source_path.empty() || dest_path.empty()) {
         std::println(std::cerr, "Uso: cp <arquivo1> <arquivo2>");
         return 1;
     }
@@ -129,7 +129,7 @@ short Command::pwd(Ext4::Image& img) {
 short Command::touch(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
-    if(file_path.empty()) {
+    if (file_path.empty()) {
         std::println(std::cerr, "Uso: touch <arquivo>");
         return 1;
     }
@@ -140,7 +140,7 @@ short Command::touch(Ext4::Image& img, const std::vector<std::string>& args) {
 short Command::mkdir(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
-    if(dir_path.empty()) {
+    if (dir_path.empty()) {
         std::println(std::cerr, "Uso: mkdir <diretório>");
         return 1;
     }
@@ -151,7 +151,7 @@ short Command::mkdir(Ext4::Image& img, const std::vector<std::string>& args) {
 short Command::rm(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
-    if(file_path.empty()) {
+    if (file_path.empty()) {
         std::println(std::cerr, "Uso: rm <arquivo>");
         return 1;
     }
@@ -162,7 +162,7 @@ short Command::rm(Ext4::Image& img, const std::vector<std::string>& args) {
 short Command::rmdir(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
-    if(dir_path.empty()) {
+    if (dir_path.empty()) {
         std::println(std::cerr, "Uso: rmdir <diretório>");
         return 1;
     }
@@ -174,7 +174,7 @@ short Command::rename(Ext4::Image& img, const std::vector<std::string>& args) {
     const std::string file = args.size() > 1 ? args[1] : "";
     const std::string new_file_name = args.size() > 2 ? args[2] : "";
 
-    if(file.empty() || new_file_name.empty()) {
+    if (file.empty() || new_file_name.empty()) {
         std::println(std::cerr, "Uso: rename <arquivo> <novo nome do arquivo>");
         return 1;
     }

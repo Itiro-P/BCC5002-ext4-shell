@@ -27,12 +27,12 @@ short Shell::run() {
             // E colocamos em um vetor de strings.
             std::ranges::to<std::vector>();
 
-        if(args.empty()) continue;
+        if (args.empty()) continue;
 
-        if(exit_commands.find(args[0]) != exit_commands.end()) break;  // sai limpo aqui
+        if (exit_commands.find(args[0]) != exit_commands.end()) break;  // sai limpo aqui
 
         // Adoro o C++
-        if(auto it = command_map.find(args[0]); it != command_map.end()) {
+        if (auto it = command_map.find(args[0]); it != command_map.end()) {
             exit_code = it->second(this->image, args);
         } else {
             std::println(std::cerr, "ext4shell: comando não encontrado: {}", args[0]);

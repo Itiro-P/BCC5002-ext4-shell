@@ -1,6 +1,11 @@
 #pragma once
 
-namespace Ext4::Inode {
+#include <array>
+#include <cstdint>
+#include <vector>
+#include "Flags.hpp"
+
+namespace Ext4::Inode::Raw {
     // Modo do arquivo e permissões (i_mode)
     enum InodeMode : uint16_t {
         // Permissões de Acesso
@@ -31,44 +36,7 @@ namespace Ext4::Inode {
 
     // Máscara para extrair estritamente o tipo de ficheiro de i_mode
     static constexpr uint16_t S_IFMT = 0xF000;
-
-    // Flags aplicadas ao comportamento do Inode (i_flags)
-    enum InodeFlags : uint32_t {
-        EXT4_SECRM_FL            = 0x00000001, // Eliminação segura exigida (não implementado)
-        EXT4_UNRM_FL             = 0x00000002, // Preservar para recuperação (não implementado)
-        EXT4_COMPR_FL            = 0x00000004, // Ficheiro comprimido (não totalmente implementado)
-        EXT4_SYNC_FL             = 0x00000008, // Escritas síncronas obrigatórias
-        EXT4_IMMUTABLE_FL        = 0x00000010, // Ficheiro imutável
-        EXT4_APPEND_FL           = 0x00000020, // Apenas permite escrita no final (Append)
-        EXT4_NODUMP_FL           = 0x00000040, // O utilitário dump(1) deve ignorar o ficheiro
-        EXT4_NOATIME_FL          = 0x00000080, // Não atualizar o tempo de acesso (atime)
-        EXT4_DIRTY_FL            = 0x00000100, // Ficheiro comprimido modificado (não usado)
-        EXT4_COMPRBLK_FL         = 0x00000200, // Possui blocos comprimidos (não usado)
-        EXT4_NOCOMPR_FL          = 0x00000400, // Não comprimir o ficheiro (não usado)
-        EXT4_ENCRYPT_FL          = 0x00000800, // Inode encriptado
-        EXT4_INDEX_FL            = 0x00001000, // Diretório possui índices indexados por hash (HTree)
-        EXT4_IMAGIC_FL           = 0x00002000, // Diretório mágico AFS
-        EXT4_JOURNAL_DATA_FL     = 0x00004000, // Dados passam obrigatoriamente pelo Journal
-        EXT4_NOTAIL_FL           = 0x00008000, // O final do ficheiro não deve ser fundido (não usado)
-        EXT4_DIRSYNC_FL          = 0x00010000, // Alterações no diretório são síncronas
-        EXT4_TOPDIR_FL           = 0x00020000, // Topo da hierarquia de diretórios
-        EXT4_HUGE_FILE_FL        = 0x00040000, // Ficheiro gigante (escala os contadores de blocos)
-        EXT4_EXTENTS_FL          = 0x00080000, // O Inode utiliza árvore de extents (i_block armazena extents)
-        EXT4_VERITY_FL           = 0x00100000, // Ficheiro protegido por Verity
-        EXT4_EA_INODE_FL         = 0x00200000, // O Inode armazena um atributo estendido grande nos seus blocos
-        EXT4_EOFBLOCKS_FL        = 0x00400000, // Possui blocos alocados para lá do EOF (depreciado)
-        EXT4_SNAPFILE_FL         = 0x01000000, // Inode é um snapshot (fora do mainline)
-        EXT4_SNAPFILE_DELETED_FL = 0x04000000, // Snapshot em remoção (fora do mainline)
-        EXT4_SNAPFILE_SHRUNK_FL  = 0x08000000, // Redução de snapshot concluída (fora do mainline)
-        EXT4_INLINE_DATA_FL      = 0x10000000, // O Inode armazena dados embutidos diretamente em i_block
-        EXT4_PROJINHERIT_FL      = 0x20000000, // Subdiretórios herdam o mesmo ID de Projeto
-        EXT4_CASEFOLD_FL         = 0x40000000, // Diretório com buscas insensíveis a maiúsculas/minúsculas
-        EXT4_RESERVED_FL         = 0x80000000, // Reservado para a biblioteca ext4
-
-        EXT4_FL_USER_VISIBLE     = 0x705BDFFF, // Máscara de flags visíveis pelo utilizador
-        EXT4_FL_USER_MODIFIABLE  = 0x604BC0FF  // Máscara de flags modificáveis pelo utilizador
-    };
-    
+  
     #pragma pack(push, 1)
     // Estruturas dependentes do Sistema Operativo Criador (Mapeamento Linux)
     struct Osd1Linux {
@@ -104,12 +72,12 @@ namespace Ext4::Inode {
         uint16_t  i_gid;            // 16 bits inferiores do GID do grupo
         uint16_t  i_links_count;    // Contador de ligações físicas (Hard links)
         uint32_t  i_blocks_lo;      // 32 bits inferiores do contador de blocos alocados (setores de 512B)
-        uint32_t  i_flags;          // Flags de comportamento do ficheiro (ver InodeFlags)
+        uint32_t  i_flags;          // Flags de comportamento do ficheiro (ver `InodeFlags`)
         
         Osd1Linux i_osd1;           // Campos específicos do SO criador (Mapeado para Linux)
         
         // Mapa de blocos (12 diretos, 1 indireto, 1 duplo, 1 triplo) OU Raiz da árvore de Extents
-        uint8_t   i_block[60];      // 60 bytes de armazenamento inline para mapeamento de dados
+        std::array<std::byte, 60> i_block;  // 60 bytes de armazenamento inline para mapeamento de dados
         
         uint32_t  i_generation;     // Versão do ficheiro (utilizado principalmente para exportações NFS)
         uint32_t  i_file_acl_lo;    // 32 bits inferiores do bloco de atributos estendidos (ACL)
@@ -134,28 +102,54 @@ namespace Ext4::Inode {
     #pragma pack(pop)
     // Garante integridade do tamanho da especificação moderna completa (160 bytes)
     static_assert(sizeof(Inode) == 160, "O tamanho da estrutura básica do Inode deve ser de 160 bytes!");
+}
 
+namespace Ext4::Inode {
     /**
      * @brief Encapsula um `Inode`. Operações de conveniência.
      */
-    class InodeWrapper {
+    class Inode {
     private:
         // O número global do inode, começando em 2 para o diretório raiz.
         uint32_t inode_id = 0;
         // O inode encapsulado, contendo os metadados físicos do ficheiro ou diretório.
-        Inode inode{};
+        Ext4::Inode::Raw::Inode inode{};
 
     public:
-        InodeWrapper() = default;
+        Inode() = default;
         
-        InodeWrapper(uint32_t id, const Inode& inode_data) 
-            : inode_id(id), inode(inode_data) {}
+        Inode(uint32_t id, const Ext4::Inode::Raw::Inode& inode_data) : inode_id(id), inode(inode_data) {}
 
         uint32_t get_inode_id() const { return this->inode_id; }
-        const Inode& get_inode() const { return this->inode; }
 
-        InodeMode get_type() const {
-            return static_cast<InodeMode>(this->inode.i_mode & S_IFMT);
-        }        
+        const Ext4::Inode::Raw::Inode& get_inode() const { return this->inode; }
+
+        uint16_t get_type() const {
+            return static_cast<uint16_t>(this->inode.i_mode & Ext4::Inode::Raw::S_IFMT);
+        }
+
+        uint64_t get_size() const {
+            return (static_cast<uint64_t>(this->inode.i_size_high) << 32) | this->inode.i_size_lo;
+        }
+
+        uint16_t get_links_count() const { 
+            return this->inode.i_links_count; 
+        }
+
+        uint32_t get_flags() const { 
+            return this->inode.i_flags; 
+        }
+
+        /**
+         * @brief Verifica se o Inode utiliza a estrutura de árvore de extents para mapear os blocos de dados, ou se utiliza o esquema tradicional de blocos diretos/indiretos.
+         * @return `true` se o Inode utiliza extents, ou `false` se utiliza blocos diretos/indiretos.
+         */
+        bool has_extents() const {
+            return (this->inode.i_flags & Ext4::Flags::EXT4_EXTENTS_FL) != 0;
+        }
+
+        std::array<std::byte, 60> get_i_block() const {
+            return this->inode.i_block;
+        }
     };
 }

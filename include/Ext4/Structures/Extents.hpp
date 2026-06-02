@@ -20,7 +20,7 @@ namespace Ext4::Structures {
      * do campo i_block, ditando como os 48 bytes restantes serão interpretados.
      */
     struct ExtentHeader {
-        uint16_t eh_magic;      // Número mágico de validação (Deve ser igual a ExtentsNS::EXT_MAGIC).
+        uint16_t eh_magic;      // Número mágico de validação (Deve ser igual a `ExtentsNS::EXT_MAGIC`).
         uint16_t eh_entries;    // Quantidade de entradas válidas (índices ou folhas) que se seguem a este cabeçalho.
         uint16_t eh_max;        // Capacidade máxima de entradas que este nó consegue armazenar fisicamente.
         uint16_t eh_depth;      // Profundidade na árvore. (0 = Nó folha contendo dados reais, >0 = Nó interno de indexação).
@@ -31,7 +31,7 @@ namespace Ext4::Structures {
     #pragma pack(push, 1)
     /**
      * @brief Nó Interno ou de Índice da árvore de extents (struct ext4_extent_idx).
-     * Utilizado estritamente quando eh_depth > 0. Aponta para um bloco de metadados descendente na árvore.
+     * Utilizado estritamente quando `eh_depth > 0`. Aponta para um bloco de metadados descendente na árvore.
      */
     struct ExtentIndex {
         uint32_t ei_block;   // O maior número de bloco lógico (offset no ficheiro) que este nó indexa.
@@ -52,7 +52,7 @@ namespace Ext4::Structures {
     #pragma pack(push, 1)
     /**
      * @brief Nó Folha contendo o mapeamento de blocos de dados (struct ext4_extent).
-     * Utilizado estritamente quando eh_depth == 0. Mapeia um intervalo sequencial de blocos lógicos a físicos.
+     * Utilizado estritamente quando `eh_depth == 0`. Mapeia um intervalo sequencial de blocos lógicos a físicos.
      */
     struct ExtentLeaf {
         uint32_t ee_block;    // O primeiro número de bloco lógico do ficheiro coberto por este extent.

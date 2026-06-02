@@ -13,7 +13,10 @@ namespace Ext4 {
         std::fstream image_file;
 
         // O inode atual, começando no diretório raiz (Inode 2).
-        Ext4::Inode::InodeWrapper current_inode;
+        Ext4::Inode::Inode current_inode;
+
+        // O diretório atual, representado como uma string de caminho (ex: "/home/user/docs").
+        std::string current_path = "/";
 
         // O superbloco lido da imagem, armazenado para uso futuro.
         Structures::SuperBlock super_block;
@@ -52,47 +55,12 @@ namespace Ext4 {
         uint32_t inodes_per_group;
         
         /**
-         * @brief Método auxiliar para posicionar o ponteiro de leitura/escrita da imagem em um offset específico.
+         * @brief Método auxiliar para posicionar o ponteiro de leitura/escrita da imagem em um offset específico a partir do início.
          * @param offset O deslocamento em bytes a partir do início da imagem para onde o ponteiro deve ser movido.
-         * @param dir A direção do deslocamento (`std::ios::beg, std::ios::cur, std::ios::end`).
          * @throws `std::runtime_error` Se ocorrer um erro ao tentar posicionar o ponteiro de leitura/escrita.
          */
-        void seek(std::streamoff offset, std::ios_base::seekdir dir);
-        
-        /**
-         * @brief Método auxiliar para ler um bloco de dados da imagem, garantindo que a quantidade de bytes lida seja a esperada.
-         * @param buffer O buffer onde os dados lidos serão armazenados.
-         * @param size O número de bytes a serem lidos.
-         * @throws `std::runtime_error` Se a quantidade de bytes lida for diferente do esperado ou se ocorrer um erro de leitura.
-         */
-        void read(char *buffer, std::streamsize size);
-        
-        /**
-         * @brief Método auxiliar que combina a funcionalidade de `seek` e `read` para ler dados de um offset específico na imagem.
-         * @param offset O deslocamento em bytes a partir do início da imagem para onde o ponteiro deve ser movido antes da leitura.
-         * @param dir A direção do deslocamento (`std::ios::beg, std::ios::cur, std::ios::end`).
-         * @param buffer O buffer onde os dados lidos serão armazenados.
-         * @param size O número de bytes a serem lidos.
-         * @throws `std::runtime_error` Se a quantidade de bytes lida for diferente do esperado ou se ocorrer um erro de leitura.
-         */
-        void seek_and_read(std::streamoff offset, std::ios_base::seekdir dir, char *buffer, std::streamsize size);
-        
-        /**
-         * @brief Concatena duas metades de bits (_lo e _hi) em um tipo inteiro maior de 64 bits.
-         * Usa conceitos do C++20 para garantir que apenas tipos inteiros sejam aceitos.
-         * @param lo A parte inferior (bits 0-31 ou 0-15) do valor a ser concatenado.
-         * @param hi A parte superior (bits 32-63 ou 16-31) do valor a ser concatenado.
-         * @return O valor concatenado resultante, com os bits de `hi` deslocados para a posição correta e combinados com `lo`.
-         */
-        template<typename T>
-        constexpr uint64_t concatenate(T lo, T hi) requires std::is_integral_v<T> {
-            // Quantos bits a estrutura original 'T' possui? (Ex: se for uint32_t, bits = 32)
-            constexpr std::size_t bits = sizeof(T) * 8;
-            
-            // Fazemos o cast do 'hi' para 64 bits ANTES do shift, 
-            // para evitar que os bits saiam do limite do tipo original.
-            return (static_cast<uint64_t>(hi) << bits) | static_cast<uint64_t>(lo);
-        }
+        void seek(std::streamoff offset);
+
         public:
         /**
          * @brief Construtor que tenta abrir o arquivo de imagem especificado e ler o superbloco para validar a imagem.
@@ -100,7 +68,7 @@ namespace Ext4 {
          * @throws `std::runtime_error` Se o arquivo não puder ser aberto ou se o superbloco não for válido (assinatura mágica incorreta).
          */
         explicit Image(const std::string& image_path);
-        
+
         // Desabilita a cópia para evitar problemas de gerenciamento de recursos.
         Image(const Image&) = delete;
         Image& operator=(const Image&) = delete;
@@ -109,11 +77,39 @@ namespace Ext4 {
         Image(Image&&) = default;
         Image& operator=(Image&&) = default;
         ~Image() { 
-            if(image_file.is_open()) image_file.close(); 
+            if (image_file.is_open()) image_file.close(); 
+        }
+        
+        /**
+         * @brief Método auxiliar para ler um offset de dados da imagem, garantindo que a quantidade de bytes lida seja a esperada.
+         * @param offset O deslocamento em bytes a partir do início da imagem para onde o ponteiro deve ser movido.
+         * @param buffer O buffer onde os dados lidos serão armazenados.
+         * @throws `std::runtime_error` Se a quantidade de bytes lida for diferente do esperado ou se ocorrer um erro de leitura.
+         */
+        void read_offset(std::streamoff offset, std::span<std::byte> buffer);
+        
+        /**
+         * @brief Método auxiliar para ler um bloco de dados da imagem, garantindo que a quantidade de bytes lida seja a esperada.
+         * @param block_num O número do bloco a ser lido.
+         * @param buffer O buffer onde os dados lidos serão armazenados.
+         * @throws `std::runtime_error` Se a quantidade de bytes lida for diferente do esperado ou se ocorrer um erro de leitura.
+         */
+        void read_block(uint64_t block_num, std::span<std::byte> buffer);
+
+        /**
+         * @brief Retorna o inode atual encapsulado em um `InodeWrapper`, que fornece métodos de conveniência para acessar os metadados do inode.
+         * @return O `InodeWrapper` do inode atual.
+         */
+        Ext4::Inode::Inode get_current_inode() const& {
+            return this->current_inode;
         }
 
-        Ext4::Inode::InodeWrapper get_current_inode() const& {
-            return this->current_inode;
+        /**
+         * @brief Retorna o caminho do diretório atual como uma string. O caminho é atualizado conforme o usuário navega pelo sistema de arquivos.
+         * @return O caminho do diretório atual.
+         */
+        std::string get_current_path() const& {
+            return this->current_path;
         }
 
         /**
@@ -121,13 +117,49 @@ namespace Ext4 {
          * @param inode_num Número do inode (ex: 2 para o diretório raiz).
          * @return Estrutura preenchida com os dados do disco Inode.
          */
-        Ext4::Inode::InodeWrapper get_inode(const uint32_t inode_num);
+        Ext4::Inode::Inode get_inode(const uint32_t inode_num);
+
+        /**
+         * @brief Obtém uma lista de blocos alocados para este Inode. Se o Inode utiliza extents, esta função irá decodificar a estrutura de extents para retornar os blocos físicos. Se o Inode utiliza blocos diretos/indiretos, esta função irá ler os blocos diretos e seguir os ponteiros de blocos indiretos conforme necessário.
+         * @param inode O Inode para o qual os blocos alocados devem ser obtidos.
+         * @return Um vetor de números de blocos alocados para este Inode.
+         * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).
+         */
+        std::vector<uint64_t> get_blocks(Ext4::Inode::Inode& inode);
 
         /**
          * @brief Lê os metadados brutos de um inode específico do disco a partir do seu número global.
          * @param inode_num Número do inode (ex: 2 para o diretório raiz).
          * @return Estrutura preenchida com os dados do disco Inode.
+         * @throws `std::runtime_error` se o Inode for inválido ou qualquer tipo de erro.
          */
-        Ext4::Inode::Inode get_raw_inode(const uint32_t inode_num);
+        Ext4::Inode::Raw::Inode get_raw_inode(const uint32_t inode_num);
+
+        /**
+         * @brief Lê os dados do Inode a partir dos blocos alocados. Esta função irá ler os blocos físicos correspondentes aos dados do Inode e concatená-los para retornar o conteúdo completo do ficheiro ou diretório.
+         * @param inode O Inode para o qual os dados devem ser lidos.
+         * @return Um vetor de bytes contendo os dados lidos.
+         * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).
+         */
+        std::vector<std::byte> read_file(const Ext4::Inode::Inode& inode);
+
+        /**
+         * @brief Lê os blocos de dados diretamente de um nó folha da árvore de extents. Deve ser chamado apenas quando `eh_depth == 0`.
+         * @param inode O Inode que contém o nó de extents a ser lido. Necessário para acessar os dados do bloco de extents.
+         * @param header O cabeçalho do nó de extents, necessário para determinar quantas entradas de blocos existem.
+         * @return Um vetor de números de blocos físicos alocados para os dados deste nó folha.
+         * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
+         */
+        std::vector<uint64_t> read_blocks_from_leafs(const Ext4::Inode::Inode& inode, const Ext4::Structures::ExtentHeader& header);
+
+        /**
+         * @brief Lê os blocos de dados a partir de um nó interno de indexação da árvore de extents. Deve ser chamado apenas quando `eh_depth > 0`.
+         * @param inode O Inode que contém o nó de extents a ser lido. Necessário para acessar os dados do bloco de extents.
+         * @param index_block O número do bloco de índice a ser lido.
+         * @param depth A profundidade da árvore de extents.
+         * @return Um vetor de números de blocos físicos alocados para os dados indexados por este nó interno.
+         * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
+         */
+        std::vector<uint64_t> read_blocks_from_index(const Ext4::Inode::Inode& inode, const uint64_t index_block, const uint16_t depth);
     };
 }

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Ext4/Structures.hpp"
+#include "Ext4/Flags.hpp"
 #include "Ext4/Journal.hpp"
 #include "Ext4/Inode.hpp"
-#include "Ext4/Flags.hpp"
 #include "Ext4/Image.hpp"
 
 /**
