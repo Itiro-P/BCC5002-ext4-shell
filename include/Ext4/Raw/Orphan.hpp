@@ -3,17 +3,9 @@
 #include <cstdint>
 #include <vector>
 #include <array>
+#include "../Constants.hpp"
 
-namespace Ext4::Structures {
-
-    /**
-     * @brief Espaço de nomes dedicado a constantes internas do ficheiro de órfãos.
-     */
-    namespace OrphanNS {
-        // Valor mágico protetor gravado estritamente no final de cada bloco de órfãos (0x0B10CA04).
-        static inline constexpr uint32_t ORPHAN_BLOCK_MAGIC = 0x0B10CA04;
-    }
-
+namespace Ext4::Raw {
     #pragma pack(push, 1)
     /**
      * @brief Estrutura física da cauda de um bloco de ficheiro de órfãos (struct ext4_orphan_block_tail).
@@ -54,8 +46,7 @@ namespace Ext4::Structures {
             );
 
             // Valida o número mágico do bloco. Se estiver incorreto ou zerado, aborta a leitura
-            using namespace Ext4::Structures::OrphanNS;
-            if (tail->ob_magic != ORPHAN_BLOCK_MAGIC) return foundInodes;
+            if (tail->ob_magic != Constants::ORPHAN_BLOCK_MAGIC) return foundInodes;
 
             // Calcula o limite máximo de entradas (inteiros de 32 bits) que cabem no corpo utilizável.
             // O corpo de dados válidos estende-se do offset 0 até (blocksize - 8 bytes da cauda).

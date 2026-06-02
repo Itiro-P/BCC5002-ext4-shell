@@ -5,7 +5,10 @@
 #include <stdexcept>
 #include <cstring>
 #include <span>
-Ext4::Image::Image(const std::string& image_path) {
+
+using namespace Ext4;
+
+Wrappers::Image::Image(const std::string& image_path) {
     // Tentamos abrir o arquivo de imagem em modo leitura e escrita, e em formato binário.
     this->image_file.open(image_path, std::ios::in | std::ios::out| std::ios::binary);
     
@@ -13,15 +16,12 @@ Ext4::Image::Image(const std::string& image_path) {
         throw std::runtime_error("Erro ao abrir a imagem: O arquivo '" + image_path + "' não existe ou está inacessível.");
     }
 
-    // Evitar muita verbosidade.
-    using namespace Ext4::Structures;
-
     // Tentamos colocar o cursor de leitura no offset fixo onde o superbloco deve residir; e
     // lemos o superbloco da imagem para validar a assinatura mágica e garantir que é um sistema de arquivos EXT4 válido.
-    SuperBlock super_block{};
-    this->read_offset(SuperBlockNS::SUPERBLOCK_OFFSET, std::as_writable_bytes(Utils::as_span(&super_block, 1)));
+    Ext4::Raw::SuperBlock super_block{};
+    this->read_offset(Ext4::Constants::SUPERBLOCK_OFFSET, Utils::as_span(super_block));
 
-    if (super_block.s_magic != SuperBlockNS::MAGIC) {
+    if (super_block.s_magic != Ext4::Constants::EXT_MAGIC) {
         throw std::runtime_error("Erro: A imagem fornecida não contem um superbloco válido do EXT4 (Assinatura mágica incorreta).");
     }
 
@@ -52,9 +52,9 @@ Ext4::Image::Image(const std::string& image_path) {
     this->inode_table_offsets.clear();
 
     for (uint32_t i = 0; i < group_count; i++) {
-        GroupDescriptor gd{};
+        Raw::GroupDescriptor gd{};
         std::streamoff offset = gdt_offset + (static_cast<uint64_t>(i) * desc_size);
-        this->read_offset(offset, std::as_writable_bytes(Utils::as_span(&gd, 1)));
+        this->read_offset(offset, Utils::as_span(gd));
         // Recupera o endereço base do bloco da tabela de inodes deste grupo
         uint64_t inode_table_block = this->is_64 ? Utils::concatenate(gd.bg_inode_table_lo, gd.bg_inode_table_hi) : gd.bg_inode_table_lo;
         
@@ -66,28 +66,43 @@ Ext4::Image::Image(const std::string& image_path) {
     std::println("Imagem lida com sucesso! Assinatura mágica verificada: 0x{:04X}\nBem-vindo ao EXT4shell!", super_block.s_magic);
 }
 
-void Ext4::Image::seek(std::streamoff offset) {
+void Wrappers::Image::seek(std::streamoff offset) {
+    this->image_file.clear(); 
+
     this->image_file.seekg(offset, std::ios::beg);
-    if (!this->image_file) throw std::runtime_error(std::format("Seek falhou no offset {}.", offset));
+
+    this->image_file.seekp(offset, std::ios::beg);
+
+    if (!this->image_file) {
+        throw std::runtime_error(std::format("Seek falhou no offset {}.", offset));
+    }
 }
 
-void Ext4::Image::read_offset(std::streamoff offset, std::span<std::byte> buffer) {
+void Wrappers::Image::read_offset(std::streamoff offset, std::span<std::byte> buffer) {
     this->seek(offset);
+    
+    // Executa a leitura binária convertendo o span de bytes para char*
     this->image_file.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-    if (this->image_file.gcount() != buffer.size()) {
+    
+    std::streamsize read_bytes = this->image_file.gcount();
+
+    if (read_bytes != static_cast<std::streamsize>(buffer.size())) {
+        // Se falhou, limpa o estado de erro para não travar os próximos comandos da aplicação
+        this->image_file.clear(); 
+        
         throw std::runtime_error(std::format(
-            "Erro ao ler da imagem: {} bytes lidos, esperados {}.",
-            this->image_file.gcount(), buffer.size()
+            "Erro ao ler da imagem: {} bytes lidos, esperados {}. (Offset: {})",
+            read_bytes, buffer.size(), offset
         ));
     }
 }
 
-void Ext4::Image::read_block(uint64_t block_num, std::span<std::byte> buffer) {
+void Wrappers::Image::read_block(uint64_t block_num, std::span<std::byte> buffer) {
     std::streamoff offset = block_num * this->block_size;
     this->read_offset(offset, buffer);
 }
 
-Ext4::Inode::Raw::Inode Ext4::Image::get_raw_inode(const uint32_t inode_num) {
+Ext4::Raw::Inode Wrappers::Image::get_raw_inode(const uint32_t inode_num) {
 
     // Validação preventiva: Inodes no EXT4 começam obrigatoriamente no índice 1
     if (inode_num == 0 || inode_num > this->inode_count) {
@@ -114,22 +129,22 @@ Ext4::Inode::Raw::Inode Ext4::Image::get_raw_inode(const uint32_t inode_num) {
     this->read_offset(final_inode_offset, Utils::as_span(buffer.data(), buffer.size()));
 
     // Copia apenas o que a struct comporta
-    Ext4::Inode::Raw::Inode inode{};
+    Ext4::Raw::Inode inode{};
     std::memcpy(&inode, buffer.data(), std::min(sizeof(inode), static_cast<size_t>(this->inode_size)));
     return inode;
 }
 
-Ext4::Inode::Inode Ext4::Image::get_inode(const uint32_t inode_num) {
-    Ext4::Inode::Raw::Inode inode = this->get_raw_inode(inode_num);
-    Ext4::Inode::Inode wrapper = Ext4::Inode::Inode(inode_num, inode);
+Wrappers::Inode Wrappers::Image::get_inode(const uint32_t inode_num) {
+    Raw::Inode inode = this->get_raw_inode(inode_num);
+    Wrappers::Inode wrapper = Wrappers::Inode(inode_num, inode);
 
     return wrapper;
 }
 
-std::vector<uint64_t> Ext4::Image::read_blocks_from_leafs(const Ext4::Inode::Inode& inode, const Ext4::Structures::ExtentHeader& header) {
+std::vector<uint64_t> Wrappers::Image::read_blocks_from_leafs(const Wrappers::Inode& inode, const Raw::ExtentHeader& header) {
     std::vector<uint64_t> blocks;
-    auto leafs = std::span<const Ext4::Structures::ExtentLeaf>(
-        reinterpret_cast<const Ext4::Structures::ExtentLeaf*>(inode.get_i_block().data() + sizeof(Ext4::Structures::ExtentHeader)), 
+    auto leafs = std::span<const Raw::ExtentLeaf>(
+        reinterpret_cast<const Raw::ExtentLeaf*>(inode.get_i_block().data() + sizeof(Raw::ExtentHeader)), 
         header.eh_entries
     );
     for (const auto& leaf : leafs) {
@@ -142,22 +157,22 @@ std::vector<uint64_t> Ext4::Image::read_blocks_from_leafs(const Ext4::Inode::Ino
     return blocks;
 }
 
-std::vector<uint64_t> Ext4::Image::read_blocks_from_index(const Ext4::Inode::Inode& inode, const uint64_t index_block, const uint16_t depth) {
+std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(const Wrappers::Inode& inode, const uint64_t index_block, const uint16_t depth) {
     std::vector<uint64_t> blocks;
     // Implementação da leitura de blocos a partir de um nó de índice
     return blocks;
 }
 
-std::vector<std::byte> Ext4::Image::read_file(const Ext4::Inode::Inode& inode) {
+std::vector<std::byte> Wrappers::Image::read_file(const Wrappers::Inode& inode) {
     std::vector<std::byte> file_data;
     return file_data;
 }
 
-std::vector<uint64_t> Ext4::Image::get_blocks(Ext4::Inode::Inode& inode) {
+std::vector<uint64_t> Wrappers::Image::get_blocks(Wrappers::Inode& inode) {
     std::vector<uint64_t> data_blocks;
-    Ext4::Structures::ExtentHeader header{};
-    std::memcpy(&header, inode.get_i_block().data(), sizeof(Ext4::Structures::ExtentHeader));
-    if (header.eh_magic != Ext4::Structures::ExtentsNS::EXT_MAGIC)
+    Raw::ExtentHeader header{};
+    std::memcpy(&header, inode.get_i_block().data(), sizeof(Raw::ExtentHeader));
+    if (header.eh_magic != Constants::EXTENT_MAGIC)
         throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico de extents inválido. O Inode pode estar corrompido ou não utilizar extents.");
     
     if (header.eh_depth == 0) {

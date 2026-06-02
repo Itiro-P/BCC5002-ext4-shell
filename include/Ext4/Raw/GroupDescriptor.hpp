@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cstddef>
 
-namespace Ext4::Structures {
+namespace Ext4::Raw {
     #pragma pack(push, 1)
     /**
      * @brief Estrutura do Descritor de Grupo de Blocos (struct ext4_group_desc).

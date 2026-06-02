@@ -3,8 +3,7 @@
 #include <array>
 #include <cstdint>
 
-namespace Ext4::Journal {
-    static inline constexpr uint32_t JBD2_MAGIC_NUMBER = 0xC03A39A2;
+namespace Ext4::Raw {
     // Tipos de blocos internos que compõem o Journal JBD2 (j_blocktype).
     enum JournalBlockType : uint32_t {
         JBD2_DESCRIPTOR_BLOCK = 1,

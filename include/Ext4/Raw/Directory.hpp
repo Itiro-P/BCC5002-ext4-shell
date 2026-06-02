@@ -3,8 +3,7 @@
 #include <cstdint>
 #include <array>
 
-namespace Ext4::Structures {
-
+namespace Ext4::Raw {
     /**
      * @brief Tipos de ficheiro utilizados no campo file_type das entradas de diretório (DirectoryEntry).
      * Mapeia nativamente o formato do driver EXT4 para identificação rápida sem ler o inode.

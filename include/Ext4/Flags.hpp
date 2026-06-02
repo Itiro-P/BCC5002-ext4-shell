@@ -173,4 +173,48 @@ namespace Ext4::Flags {
         EXT4_FL_USER_VISIBLE     = 0x705BDFFF, // Máscara de flags visíveis pelo utilizador
         EXT4_FL_USER_MODIFIABLE  = 0x604BC0FF  // Máscara de flags modificáveis pelo utilizador
     };
+
+    // Modo do arquivo e permissões (i_mode)
+    enum InodeMode : uint16_t {
+        // Permissões de Acesso
+        S_IXOTH = 0x0001, // Outros utilizadores têm permissão de execução
+        S_IWOTH = 0x0002, // Outros utilizadores têm permissão de escrita
+        S_IROTH = 0x0004, // Outros utilizadores têm permissão de leitura
+        S_IXGRP = 0x0008, // Membros do grupo têm permissão de execução
+        S_IWGRP = 0x0010, // Membros do grupo têm permissão de escrita
+        S_IRGRP = 0x0020, // Membros do grupo têm permissão de leitura
+        S_IXUSR = 0x0040, // O proprietário tem permissão de execução
+        S_IWUSR = 0x0080, // O proprietário tem permissão de escrita
+        S_IRUSR = 0x0100, // O proprietário tem permissão de leitura
+        
+        // Atributos Especiais
+        S_ISVTX = 0x0200, // Sticky bit
+        S_ISGID = 0x0400, // Set GID
+        S_ISUID = 0x0800, // Set UID
+        
+        // Tipos de Ficheiro (Mutuamente Exclusivos)
+        S_IFIFO  = 0x1000, // FIFO (Pipe nomeado)
+        S_IFCHR  = 0x2000, // Dispositivo de caracteres
+        S_IFDIR  = 0x4000, // Diretório
+        S_IFBLK  = 0x6000, // Dispositivo de blocos
+        S_IFREG  = 0x8000, // Ficheiro regular
+        S_IFLNK  = 0xA000, // Ligação simbólica (Symbolic link)
+        S_IFSOCK = 0xC000  // Socket
+    };
+
+    // Estruturas dependentes do Sistema Operativo Criador (Mapeamento Linux)
+    struct Osd1Linux {
+        uint32_t l_i_version;       // Versão do Inode (ou parte superior do refcount de EA_INODE)
+    };
+
+    #pragma pack(push, 1)
+    struct Osd2Linux {
+        uint16_t l_i_blocks_high;   // 16 bits superiores do contador de blocos
+        uint16_t l_i_file_acl_high; // 16 bits superiores do bloco de atributos estendidos (ACL)
+        uint16_t l_i_uid_high;      // 16 bits superiores do UID do proprietário
+        uint16_t l_i_gid_high;      // 16 bits superiores do GID do grupo
+        uint16_t l_i_checksum_lo;   // 16 bits inferiores do Checksum do inode
+        uint16_t l_i_reserved;      // Espaço não utilizado
+    };
+    #pragma pack(pop)
 }

@@ -3,25 +3,12 @@
 #include <array>
 #include <cstdint>
 
-namespace Ext4::Structures {
-
-    /**
-     * @brief Espaço de nomes dedicado a constantes globais de localização e identificação do Superbloco.
-     */
-    namespace SuperBlockNS {
-        // Número mágico universal que identifica um sistema de arquivos da família EXT (`0xEF53`).
-        static inline constexpr uint16_t MAGIC = 0xEF53;
-        
-        // Deslocamento fixo (em bytes) a partir do início do disco/partição onde o Superbloco reside.
-        // Este espaço inicial de 1024 bytes é estritamente reservado para o x86 Bootloader/MBR.
-        static inline constexpr uint32_t SUPERBLOCK_OFFSET = 1024;
-    }
-
+namespace Ext4::Raw {
     #pragma pack(push, 1)
     /**
      * @brief Estrutura do Superbloco do EXT4 (struct ext4_super_block).
      * Contém o registro mestre de toda a configuração, geometria, estado de integridade,
-     * contadores de blocos/inodes livres e a lista de recursos (features) ativos na imagem.
+     * contadores de blocos/inodes livres e a lista de recursos (features) ativos na image.
      */
     struct SuperBlock {
         // Geometria Básica e Contadores (0x00) 

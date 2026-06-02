@@ -3,16 +3,7 @@
 #include <array>
 #include <cstdint>
 
-namespace Ext4::Structures {
-
-    /**
-     * @brief Espaço de nomes dedicado a constantes internas dos Atributos Estendidos.
-     */
-    namespace XattrNS {
-        // Número mágico universal que valida a assinatura dos Atributos Estendidos (0xEA020000).
-        static inline constexpr uint32_t XATTR_MAGIC = 0xEA020000;
-    }
-
+namespace Ext4::Raw {
     /**
      * @brief Índices de mapeamento que substituem os prefixos textuais comuns das chaves.
      * Poupa espaço físico em disco armazenando apenas um ID numérico em vez da string completa do namespace.

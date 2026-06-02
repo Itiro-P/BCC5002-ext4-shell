@@ -27,13 +27,24 @@ namespace Utils {
     }
 
     /**
-     * @brief Cria um `std::span` a partir de um ponteiro e um tamanho, garantindo que o tipo seja tratado como bytes.
-     * @param ptr O ponteiro para o início dos dados.
-     * @param size O número de bytes a incluir no span.
+     * @brief Cria um `std::span` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
+     * @param obj A referência para o objeto.
      * @return Um `std::span<std::byte>` que abrange os dados especificados.
      */
     template<typename T>
-    inline constexpr std::span<std::byte> as_span(T* ptr, std::size_t size) {
-        return std::span<std::byte>(reinterpret_cast<std::byte*>(ptr), size);
+    inline constexpr std::span<std::byte> as_span(T& obj) {
+        return std::span<std::byte>(reinterpret_cast<std::byte*>(&obj), sizeof(T));
+    }
+
+    /**
+     * @brief Cria um `std::span` a partir de uma ponteiro para um objeto, garantindo que o tipo seja tratado como bytes.
+     * @param ptr A referência para o objeto.
+     * @param count O número de objetos do tipo T que o ponteiro aponta.
+     * @return Um `std::span<std::byte>` que abrange os dados especificados.
+     */
+    template<typename T>
+        inline constexpr std::span<std::byte> as_span(T* ptr, std::size_t count) {
+        // Multiplica a contagem de objetos pelo tamanho real de bytes de cada objeto
+        return std::span<std::byte>(reinterpret_cast<std::byte*>(ptr), count * sizeof(T));
     }
 };

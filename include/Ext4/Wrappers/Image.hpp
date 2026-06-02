@@ -2,8 +2,12 @@
 
 #include <fstream>
 #include <string>
+#include "../../Ext4/Raw.hpp"
+#include "Inode.hpp"
 
-namespace Ext4 {
+using namespace Ext4;
+
+namespace Ext4::Wrappers {
     /**
      * @brief Classe utilitária responsável por encapsular a manipulação de arquivos de imagem de disco.
      * @author Pedro Itiro Nagao
@@ -13,16 +17,16 @@ namespace Ext4 {
         std::fstream image_file;
 
         // O inode atual, começando no diretório raiz (Inode 2).
-        Ext4::Inode::Inode current_inode;
+        Wrappers::Inode current_inode;
 
         // O diretório atual, representado como uma string de caminho (ex: "/home/user/docs").
         std::string current_path = "/";
 
         // O superbloco lido da imagem, armazenado para uso futuro.
-        Structures::SuperBlock super_block;
+        Raw::SuperBlock super_block;
 
         // O vetor contendo a tabela de descritores de grupos, lida a partir do próximo bloco após o superbloco.
-        std::vector<Structures::GroupDescriptor> group_descriptors;
+        std::vector<Raw::GroupDescriptor> group_descriptors;
 
         // Se estamos em um sistema de arquivos com suporte a 64 bits.
         bool is_64;
@@ -97,10 +101,10 @@ namespace Ext4 {
         void read_block(uint64_t block_num, std::span<std::byte> buffer);
 
         /**
-         * @brief Retorna o inode atual encapsulado em um `InodeWrapper`, que fornece métodos de conveniência para acessar os metadados do inode.
-         * @return O `InodeWrapper` do inode atual.
+         * @brief Retorna o inode atual encapsulado em um `Inode`, que fornece métodos de conveniência para acessar os metadados do inode.
+         * @return O `Inode` do inode atual.
          */
-        Ext4::Inode::Inode get_current_inode() const& {
+        Wrappers::Inode get_current_inode() const& {
             return this->current_inode;
         }
 
@@ -116,8 +120,17 @@ namespace Ext4 {
          * @brief Lê os metadados de um inode específico do disco a partir do seu número global.
          * @param inode_num Número do inode (ex: 2 para o diretório raiz).
          * @return Estrutura preenchida com os dados do disco Inode.
+         * @throws `std::runtime_error` se o Inode for inválido ou qualquer tipo de erro.
          */
-        Ext4::Inode::Inode get_inode(const uint32_t inode_num);
+        Raw::Inode get_raw_inode(const uint32_t inode_num);
+
+        /**
+         * @brief Lê os metadados de um inode específico do disco a partir do seu número global.
+         * @param inode_num Número do inode (ex: 2 para o diretório raiz).
+         * @return Estrutura preenchida com os dados do disco Inode.
+         * @throws `std::runtime_error` se o Inode for inválido ou qualquer tipo de erro.
+         */
+        Wrappers::Inode get_inode(const uint32_t inode_num);
 
         /**
          * @brief Obtém uma lista de blocos alocados para este Inode. Se o Inode utiliza extents, esta função irá decodificar a estrutura de extents para retornar os blocos físicos. Se o Inode utiliza blocos diretos/indiretos, esta função irá ler os blocos diretos e seguir os ponteiros de blocos indiretos conforme necessário.
@@ -125,15 +138,7 @@ namespace Ext4 {
          * @return Um vetor de números de blocos alocados para este Inode.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<uint64_t> get_blocks(Ext4::Inode::Inode& inode);
-
-        /**
-         * @brief Lê os metadados brutos de um inode específico do disco a partir do seu número global.
-         * @param inode_num Número do inode (ex: 2 para o diretório raiz).
-         * @return Estrutura preenchida com os dados do disco Inode.
-         * @throws `std::runtime_error` se o Inode for inválido ou qualquer tipo de erro.
-         */
-        Ext4::Inode::Raw::Inode get_raw_inode(const uint32_t inode_num);
+        std::vector<uint64_t> get_blocks(Wrappers::Inode& inode);
 
         /**
          * @brief Lê os dados do Inode a partir dos blocos alocados. Esta função irá ler os blocos físicos correspondentes aos dados do Inode e concatená-los para retornar o conteúdo completo do ficheiro ou diretório.
@@ -141,7 +146,7 @@ namespace Ext4 {
          * @return Um vetor de bytes contendo os dados lidos.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<std::byte> read_file(const Ext4::Inode::Inode& inode);
+        std::vector<std::byte> read_file(const Wrappers::Inode& inode);
 
         /**
          * @brief Lê os blocos de dados diretamente de um nó folha da árvore de extents. Deve ser chamado apenas quando `eh_depth == 0`.
@@ -150,7 +155,7 @@ namespace Ext4 {
          * @return Um vetor de números de blocos físicos alocados para os dados deste nó folha.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<uint64_t> read_blocks_from_leafs(const Ext4::Inode::Inode& inode, const Ext4::Structures::ExtentHeader& header);
+        std::vector<uint64_t> read_blocks_from_leafs(const Wrappers::Inode& inode, const Raw::ExtentHeader& header);
 
         /**
          * @brief Lê os blocos de dados a partir de um nó interno de indexação da árvore de extents. Deve ser chamado apenas quando `eh_depth > 0`.
@@ -160,6 +165,6 @@ namespace Ext4 {
          * @return Um vetor de números de blocos físicos alocados para os dados indexados por este nó interno.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<uint64_t> read_blocks_from_index(const Ext4::Inode::Inode& inode, const uint64_t index_block, const uint16_t depth);
+        std::vector<uint64_t> read_blocks_from_index(const Wrappers::Inode& inode, const uint64_t index_block, const uint16_t depth);
     };
 }

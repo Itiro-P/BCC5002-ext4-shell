@@ -3,16 +3,7 @@
 #include <cstdint>
 #include <array>
 
-namespace Ext4::Structures {
-
-    /**
-     * @brief Espaço de nomes dedicado a constantes e enumeradores internos da árvore de extents.
-     */
-    namespace ExtentsNS {
-        // Número mágico universal que identifica um cabeçalho de nó válido na árvore de extents (0xF30A).
-        static inline constexpr uint16_t EXT_MAGIC = 0xF30A;
-    }
-
+namespace Ext4::Raw {
     #pragma pack(push, 1)
     /**
      * @brief Cabeçalho do nó da árvore de extents (struct ext4_extent_header).
@@ -20,7 +11,7 @@ namespace Ext4::Structures {
      * do campo i_block, ditando como os 48 bytes restantes serão interpretados.
      */
     struct ExtentHeader {
-        uint16_t eh_magic;      // Número mágico de validação (Deve ser igual a `ExtentsNS::EXT_MAGIC`).
+        uint16_t eh_magic;      // Número mágico de validação (Deve ser igual a `Flags::EXT_MAGIC`).
         uint16_t eh_entries;    // Quantidade de entradas válidas (índices ou folhas) que se seguem a este cabeçalho.
         uint16_t eh_max;        // Capacidade máxima de entradas que este nó consegue armazenar fisicamente.
         uint16_t eh_depth;      // Profundidade na árvore. (0 = Nó folha contendo dados reais, >0 = Nó interno de indexação).

@@ -3,20 +3,7 @@
 #include <array>
 #include <cstdint>
 
-namespace Ext4::Structures {
-
-    /**
-     * @brief Espaço de nomes dedicado a constantes e assinaturas mágicas do mecanismo MMP.
-     */
-    namespace MmpNS {
-        // Número mágico universal que valida o bloco MMP (0x004D4D50 -> "MMP" em ASCII).
-        static inline constexpr uint32_t MMP_MAGIC = 0x004D4D50;
-        
-        // Valores sequenciais especiais que indicam estados controlados de libertação do disco.
-        static inline constexpr uint32_t MMP_SEQ_CLEAN = 0xFFE44D4D; // O volume foi desmontado de forma limpa e está livre.
-        static inline constexpr uint32_t MMP_SEQ_FSCK  = 0xE24D4D50; // O utilitário fsck está a modificar o sistema de ficheiros.
-    }
-
+namespace Ext4::Raw {
     #pragma pack(push, 1)
     /**
      * @brief Estrutura do Bloco de Proteção de Montagem Múltipla (struct mmp_struct).
