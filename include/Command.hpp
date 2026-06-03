@@ -1,12 +1,18 @@
 #pragma once
 
-#include "Ext4Image.hpp"
+#include "Ext4.hpp"
 #include <string>
 #include <cstdint>
 #include <vector>
 #include <array>
 #include <print>
 
+using namespace Ext4;
+
+/**
+ * @brief Namespace que contém as definições dos comandos disponíveis no shell.
+ * @author Pedro Itiro Nagao
+ */
 namespace Command {
     /**
      * @brief Estrutura para armazenar informações sobre os comandos disponíveis no shell.
@@ -42,7 +48,7 @@ namespace Command {
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short info(Ext4Image& img);
+    short info(Wrappers::Image &img);
 
     /**
      * @brief Exibe o conteúdo de um arquivo no formato texto.
@@ -50,7 +56,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser exibido.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short cat(Ext4Image& img, const std::vector<std::string>& args);
+    short cat(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Exibe os atributos de um arquivo ou diretório.
@@ -58,7 +64,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo/diretório alvo.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short attr(Ext4Image& img, const std::vector<std::string>& args);
+    short attr(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Muda o diretório atual para o especificado.
@@ -66,7 +72,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório destino.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short cd(Ext4Image& img, const std::vector<std::string>& args);
+    short cd(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Lista o conteúdo do diretório atual.
@@ -75,7 +81,7 @@ namespace Command {
      * Caso não seja fornecido um argumento, o conteúdo do diretório atual será listado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short ls(Ext4Image& img, const std::vector<std::string>& args);
+    short ls(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Testa se um `inode` está livre ou ocupado.
@@ -83,7 +89,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o número do inode (em formato string) a ser testado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short test_inode(Ext4Image& img, const std::vector<std::string>& args);
+    short test_inode(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Testa se um `bloco` está livre ou ocupado.
@@ -91,7 +97,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o número do bloco (em formato string) a ser testado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short test_block(Ext4Image& img, const std::vector<std::string>& args);
+    short test_block(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Copia um arquivo para outro local.
@@ -100,14 +106,14 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` é o caminho do arquivo de origem e `args[2]` é o caminho do destino.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short cp(Ext4Image& img, const std::vector<std::string>& args);
+    short cp(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Exibe o diretório atual.
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short pwd(Ext4Image& img);
+    short pwd(Wrappers::Image &img);
 
     /**
      * @brief Cria um arquivo vazio.
@@ -115,7 +121,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser criado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short touch(Ext4Image& img, const std::vector<std::string>& args);
+    short touch(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Cria um diretório.
@@ -123,7 +129,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório a ser criado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short mkdir(Ext4Image& img, const std::vector<std::string>& args);
+    short mkdir(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Remove um arquivo.
@@ -131,7 +137,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser removido.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short rm(Ext4Image& img, const std::vector<std::string>& args);
+    short rm(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Remove um diretório vazio.
@@ -139,7 +145,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório a ser removido (que deve estar vazio).
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short rmdir(Ext4Image& img, const std::vector<std::string>& args);
+    short rmdir(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Renomeia um arquivo.
@@ -147,7 +153,7 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` é o caminho atual do arquivo e `args[2]` é o novo nome/caminho.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short rename(Ext4Image& img, const std::vector<std::string>& args);
+    short rename(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Limpa o terminal.

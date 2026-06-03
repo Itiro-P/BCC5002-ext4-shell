@@ -3,7 +3,7 @@ CXXFLAGS := -std=c++23 -Wall -Wextra -pedantic -O2
 DBGFLAGS := -std=c++23 -Wall -Wextra -pedantic -g -O0 -DDEBUG -fsanitize=address,undefined
 
 TARGET   := ext4shell
-SRCS     := main.cpp $(wildcard src/*.cpp)
+SRCS     := main.cpp $(wildcard src/*.cpp) $(wildcard src/Wrappers/*.cpp)
 OBJS     := $(SRCS:.cpp=.o)
 DEPS     := $(SRCS:.cpp=.d)
 
