@@ -206,8 +206,5 @@ short Command::rename(Image &img, const std::vector<std::string> &args) {
 short Command::clear() {
     // Usamos CSI J 2 para limpar a tela e CSI H para mover o cursor para a posição inicial.
     std::print("\033[2J\033[H");
-
-    // necessário implementar
-
     return 0;
 }
