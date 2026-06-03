@@ -18,7 +18,7 @@ namespace Utils {
      * Usa conceitos do C++20 para garantir que apenas tipos inteiros sejam aceitos.
      * @param lo A parte inferior (bits 0-31 ou 0-15) do valor a ser concatenado.
      * @param hi A parte superior (bits 32-63 ou 16-31) do valor a ser concatenado.
-     * @return O valor concatenado resultante, com os bits de `hi` deslocados para a posição correta e combinados com `lo`.
+     * @returns O valor concatenado resultante, com os bits de `hi` deslocados para a posição correta e combinados com `lo`.
      */
     template<typename T>
     inline constexpr uint64_t concatenate(T lo, T hi) requires std::is_integral_v<T> {
@@ -97,7 +97,7 @@ namespace Utils {
     /**
      * @brief Cria um `std::span<std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
      * @param c O container.
-     * @return Um `std::span<std::byte>` que abrange os dados especificados.
+     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
      */
     inline constexpr auto as_span(Container auto &c) {
         using ContainerType = std::remove_cvref_t<decltype(c)>;
@@ -107,7 +107,7 @@ namespace Utils {
     /**
      * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
      * @param c Ocontainer.
-     * @return Um `std::span<const std::byte>` que abrange os dados especificados.
+     * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
      */
     inline constexpr auto as_span(const Container auto &c) {
         using ContainerType = std::remove_cvref_t<decltype(c)>;
@@ -117,7 +117,7 @@ namespace Utils {
     /**
      * @brief Cria um `std::span<std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
      * @param c O objeto.
-     * @return Um `std::span<std::byte>` que abrange os dados especificados.
+     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
      */
     inline constexpr auto as_span(Object auto &o) {
         return std::span(reinterpret_cast<std::byte*>(&o), sizeof(o));
@@ -126,7 +126,7 @@ namespace Utils {
     /**
      * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
      * @param c O objeto.
-     * @return Um `std::span<const std::byte>` que abrange os dados especificados.
+     * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
      */
     inline constexpr auto as_span(const Object auto &o) {
         return std::span(reinterpret_cast<const std::byte*>(&o), sizeof(o));
@@ -153,6 +153,36 @@ namespace Utils {
         }) |
         // E colocamos em um vetor de strings.
         std::ranges::to<std::vector>();
+    }
+
+    /**
+     * @brief Tokeniza uma string considerando que substrings com aspas devem ficar juntas.
+     * @param s A string.
+     * @returns Um vetor de strings tokenizadas.
+     */
+    inline constexpr std::vector<std::string> tokenize(std::string_view s) {
+        std::vector<std::string> tokens;
+        std::string current;
+        char inQuote = 0;
+
+        for (const auto &ch : s) {
+            if (inQuote && ch == inQuote) {
+                inQuote = 0;
+            } else if (!inQuote && (ch == '\'' || ch == '"')) {
+                inQuote = ch;
+            } else if (!inQuote && ch == ' ') {
+                if (!current.empty()) {
+                    tokens.push_back(std::move(current));
+                    current.clear();
+                }
+            } else {
+                current += ch;
+            }
+        }
+
+        if (!current.empty()) tokens.push_back(std::move(current));
+
+        return tokens;
     }
 
     /**

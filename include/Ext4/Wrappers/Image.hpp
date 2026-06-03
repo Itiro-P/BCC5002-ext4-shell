@@ -106,7 +106,7 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Retorna o inode root encapsulado em um `Inode`, que fornece métodos de conveniência para acessar os metadados do inode.
-         * @return O `Inode` do inode atual.
+         * @returns O `Inode` do inode atual.
          */
         Wrappers::Inode get_root_inode() const {
             return this->root_inode;
@@ -114,7 +114,7 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Retorna o inode atual encapsulado em um `Inode`, que fornece métodos de conveniência para acessar os metadados do inode.
-         * @return O `Inode` do inode atual.
+         * @returns O `Inode` do inode atual.
          */
         Wrappers::Inode get_current_inode() const {
             return this->current_inode;
@@ -138,7 +138,7 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Retorna o caminho do diretório atual como uma string. O caminho é atualizado conforme o usuário navega pelo sistema de arquivos.
-         * @return O caminho do diretório atual.
+         * @returns O caminho do diretório atual.
          */
         std::string get_current_path() const {
             return this->current_path;
@@ -147,7 +147,7 @@ namespace Ext4::Wrappers {
         /**
          * @brief Retorna uma lista de entradas de um inode.
          * @param inode o Inode a ser listado.
-         * @return Uma lista de entradas.
+         * @returns Uma lista de entradas.
          * @throws `std::runtime_error` para quaisquer erros durante a execução.
          */
         std::vector<Wrappers::DirectoryEntry> list_dir(const Wrappers::Inode &inode);
@@ -157,7 +157,7 @@ namespace Ext4::Wrappers {
          * Se `path` for vazio, inode do diretório atual da imagem é retornado.
          * @param path O diretório alvo.
          * @param base o Inode base a ser o alvo inicial de procura.
-         * @return O Inode relacionado ao diretório alvo.
+         * @returns O Inode relacionado ao diretório alvo.
          * @throws `std::runtime_error` para quaisquers erros que ocorram na execução.
          */
         std::pair<Wrappers::Inode, std::string> resolve_path(const std::string &path, const Wrappers::Inode &base);
@@ -165,7 +165,7 @@ namespace Ext4::Wrappers {
         /**
          * @brief Lê os metadados de um inode específico do disco a partir do seu número global.
          * @param inode_num Número do inode (ex: 2 para o diretório raiz).
-         * @return Estrutura preenchida com os dados do disco Inode.
+         * @returns Estrutura preenchida com os dados do disco Inode.
          * @throws `std::runtime_error` se o Inode for inválido ou qualquer tipo de erro.
          */
         Raw::Inode get_raw_inode(const uint32_t inode_num);
@@ -173,7 +173,7 @@ namespace Ext4::Wrappers {
         /**
          * @brief Lê os metadados de um inode específico do disco a partir do seu número global.
          * @param inode_num Número do inode (ex: 2 para o diretório raiz).
-         * @return Estrutura preenchida com os dados do disco Inode.
+         * @returns Estrutura preenchida com os dados do disco Inode.
          * @throws `std::runtime_error` se o Inode for inválido ou qualquer tipo de erro.
          */
         Wrappers::Inode get_inode(const uint32_t inode_num);
@@ -181,7 +181,7 @@ namespace Ext4::Wrappers {
         /**
          * @brief Obtém uma lista de blocos alocados para este Inode. Se o Inode utiliza extents, esta função irá decodificar a estrutura de extents para retornar os blocos físicos. Se o Inode utiliza blocos diretos/indiretos, esta função irá ler os blocos diretos e seguir os ponteiros de blocos indiretos conforme necessário.
          * @param inode O Inode para o qual os blocos alocados devem ser obtidos.
-         * @return Um vetor de números de blocos alocados para este Inode.
+         * @returns Um vetor de números de blocos alocados para este Inode.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
         std::vector<uint64_t> get_blocks(const Wrappers::Inode &inode);
@@ -189,7 +189,7 @@ namespace Ext4::Wrappers {
         /**
          * @brief Lê os dados do Inode a partir dos blocos alocados. Esta função irá ler os blocos físicos correspondentes aos dados do Inode e concatená-los para retornar o conteúdo completo do ficheiro ou diretório.
          * @param inode O Inode para o qual os dados devem ser lidos.
-         * @return Um vetor de bytes contendo os dados lidos.
+         * @returns Um vetor de bytes contendo os dados lidos.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
         std::vector<std::byte> read_file(const Wrappers::Inode &inode);
@@ -198,7 +198,7 @@ namespace Ext4::Wrappers {
          * @brief Lê os blocos de dados diretamente de um nó folha da árvore de extents. Deve ser chamado apenas quando `eh_depth == 0`.
          * @param node_data Os dados do nó de extents a ser lido.
          * @param header O cabeçalho do nó de extents, necessário para determinar quantas entradas de blocos existem.
-         * @return Um vetor de números de blocos físicos alocados para os dados deste nó folha.
+         * @returns Um vetor de números de blocos físicos alocados para os dados deste nó folha.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
         std::vector<uint64_t> read_blocks_from_leafs(std::span<const std::byte> node_data, const Raw::ExtentHeader &header);
@@ -207,7 +207,7 @@ namespace Ext4::Wrappers {
          * @brief Lê os blocos de dados a partir de um nó interno de indexação da árvore de extents. Deve ser chamado apenas quando `eh_depth > 0`.
          * @param node_data Os dados do nó de extents a ser lido.
          * @param header O cabeçalho do nó de extents, necessário para determinar quantas entradas de blocos existem.
-         * @return Um vetor de números de blocos físicos alocados para os dados indexados por este nó interno.
+         * @returns Um vetor de números de blocos físicos alocados para os dados indexados por este nó interno.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
         std::vector<uint64_t> read_blocks_from_index(std::span<const std::byte> node_data, const Raw::ExtentHeader &header);
@@ -216,7 +216,7 @@ namespace Ext4::Wrappers {
          * @brief Cria um diretório e retorna o Inode relacionado a ele.
          * @param name O (futuro) nome do diretório.
          * @param parent_inode O ID do inode parente a ele.
-         * @return Um novo Inode já salvo na imagem.
+         * @returns Um novo Inode já salvo na imagem.
          * @throws `std::runtime_error` para quaisquers erros graves na execução.
          */
         //Wrappers::Inode make_dir(const std::string &name, const uint32_t parent_inode);

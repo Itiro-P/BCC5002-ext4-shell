@@ -1,6 +1,7 @@
 #include "../include/Command.hpp"
 #include <iostream>
 #include <charconv>
+#include <ranges>
 
 using Ext4::Wrappers::Image;
 
@@ -23,8 +24,31 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    // necessário implementar
+    size_t bar = file_path.find_last_of("/");
+    std::string path = (bar == std::string::npos) ? "" : file_path.substr(0, bar);
+    std::string filename = (bar == std::string::npos) ? file_path : file_path.substr(bar + 1);
 
+    auto [inode, resolved_path] = img.resolve_path(path, img.get_current_inode());
+    auto entries = img.list_dir(inode);
+
+    // Cria a view filtrada
+    auto target_file = entries | std::views::filter([&](const auto& entry) {
+        return entry.get_name() == filename;
+    });
+
+    // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
+    if (std::ranges::empty(target_file)) {
+        std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", filename);
+        return 1;
+    }
+
+    Wrappers::DirectoryEntry file = *target_file.begin();
+    Wrappers::Inode file_inode = img.get_inode(file.get_inode());
+    
+    std::vector<std::byte> bytes = img.read_file(file_inode);
+
+    std::string_view content(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    std::println("{}", content);
     return 0;
 }
 

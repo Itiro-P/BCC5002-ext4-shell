@@ -12,7 +12,7 @@ short Shell::run() {
 
         if (!std::getline(std::cin, line)) break;  // EOF (Ctrl+D)
 
-        std::vector<std::string> args = Utils::filter_split(line);
+        std::vector<std::string> args = Utils::tokenize(line);
 
         if (args.empty()) continue;
 

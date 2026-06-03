@@ -31,7 +31,7 @@ namespace Ext4::Raw {
         /**
          * @brief Varre o buffer de um bloco de órfãos e extrai todos os IDs de inodes válidos ativos.
          * @param blockBuffer Vetor contendo os bytes puros (raw data) do bloco lido do disco (ex: 4096 bytes).
-         * @return std::vector<uint32_t> Lista contendo os números dos inodes órfãos recuperados para processamento.
+         * @returns std::vector<uint32_t> Lista contendo os números dos inodes órfãos recuperados para processamento.
          */
         static inline std::vector<uint32_t> parseInodes(const std::vector<uint8_t> &blockBuffer) {
             std::vector<uint32_t> foundInodes;

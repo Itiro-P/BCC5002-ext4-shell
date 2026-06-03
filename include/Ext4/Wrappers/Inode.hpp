@@ -62,7 +62,7 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Verifica se o Inode utiliza a estrutura de árvore de extents para mapear os blocos de dados, ou se utiliza o esquema tradicional de blocos diretos/indiretos.
-         * @return `true` se o Inode utiliza extents, ou `false` se utiliza blocos diretos/indiretos.
+         * @returns `true` se o Inode utiliza extents, ou `false` se utiliza blocos diretos/indiretos.
          */
         bool has_extents() const { return (this->raw.i_flags & Flags::EXT4_EXTENTS_FL) != 0; }
 
