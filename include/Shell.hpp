@@ -23,6 +23,7 @@ class Shell {
 
     // Comandos para saida do shell.
     static inline std::unordered_set<std::string> exit_commands{"exit", "quit", "\\q"};
+
     // Hash de comandos com suas respectivas funções.
     static inline std::unordered_map<std::string, std::function<short(Image&, const CommandArgs&)>> command_map{ 
         {"help",   [](Image &img, const CommandArgs &args) { return Command::help(); }},

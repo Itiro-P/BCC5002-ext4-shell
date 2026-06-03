@@ -5,6 +5,7 @@
 
 short Shell::run() {
     std::string line;
+
     short exit_code = 0;
 
     while (true) {
@@ -13,8 +14,9 @@ short Shell::run() {
         if (!std::getline(std::cin, line)) break;  // EOF (Ctrl+D)
 
         // Usamos ranges para dividir a string de comando em argumentos, usando o espaço como delimitador.
-        // Colocamos a string alvo. em um std::string_view para evitar cópias desnecessárias, e depois transformamos cada argumento em std::string.
+        // Colocamos a string alvo, em um std::string_view para evitar cópias desnecessárias, e depois transformamos cada argumento em std::string.
         std::vector<std::string> args = line | 
+            // Quebramos a linha em argumentos
             std::views::split(' ') | 
             // Eliminamos (filtramos) os argumentos vazios ou que contenham apenas espaços.
             std::views::filter([](auto&& arg) { 

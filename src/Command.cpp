@@ -23,6 +23,8 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
+    // necessário implementar
+
     return 0;
 }
 
@@ -34,6 +36,8 @@ short Command::attr(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
+    // necessário implementar
+
     return 0;
 }
 
@@ -44,6 +48,8 @@ short Command::cd(Image &img, const std::vector<std::string> &args) {
         std::println(std::cerr, "Uso: cd <diretório>");
         return 1;
     }
+    
+    // necessário implementar
 
     return 0;
 }
@@ -104,7 +110,7 @@ short Command::test_block(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    // Faça sua mágica!
+    // necessário implementar
 
     return 0;
 }
@@ -117,6 +123,8 @@ short Command::cp(Image &img, const std::vector<std::string> &args) {
         std::println(std::cerr, "Uso: cp <arquivo1> <arquivo2>");
         return 1;
     }
+
+    // necessário implementar
 
     return 0;
 }
@@ -133,6 +141,8 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
+    // necessário implementar
+
     return 0;
 }
 
@@ -143,6 +153,8 @@ short Command::mkdir(Image &img, const std::vector<std::string> &args) {
         std::println(std::cerr, "Uso: mkdir <diretório>");
         return 1;
     }
+
+    // necessário implementar
 
     return 0;
 }
@@ -155,6 +167,8 @@ short Command::rm(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
+    // necessário implementar
+
     return 0;
 }
 
@@ -165,6 +179,8 @@ short Command::rmdir(Image &img, const std::vector<std::string> &args) {
         std::println(std::cerr, "Uso: rmdir <diretório>");
         return 1;
     }
+
+    // necessário implementar
 
     return 0;
 }
@@ -177,11 +193,17 @@ short Command::rename(Image &img, const std::vector<std::string> &args) {
         std::println(std::cerr, "Uso: rename <arquivo> <novo nome do arquivo>");
         return 1;
     }
+
+    // necessário implementar
+
     return 0;
 }
 
 short Command::clear() {
     // Usamos CSI J 2 para limpar a tela e CSI H para mover o cursor para a posição inicial.
     std::print("\033[2J\033[H");
+
+    // necessário implementar
+
     return 0;
 }

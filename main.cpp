@@ -18,9 +18,9 @@ int main(int argc, char* argv[]) {
 
     try {
         Shell shell = Shell(image_path);
-
         return shell.run();
-    } catch (const std::exception &e) {
+        
+    } catch (const std::exception& e) {
         std::println(std::cerr, "Erro ao inicializar a imagem: {}", e.what());
         return 1;
     }
