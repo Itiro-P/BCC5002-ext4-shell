@@ -11,7 +11,7 @@ namespace Ext4::Raw {
      * do campo i_block, ditando como os 48 bytes restantes serão interpretados.
      */
     struct ExtentHeader {
-        uint16_t eh_magic;      // Número mágico de validação (Deve ser igual a `Flags::EXT_MAGIC`).
+        uint16_t eh_magic;      // Número mágico de validação (Deve ser igual a `Constants::EXTENT_MAGIC`).
         uint16_t eh_entries;    // Quantidade de entradas válidas (índices ou folhas) que se seguem a este cabeçalho.
         uint16_t eh_max;        // Capacidade máxima de entradas que este nó consegue armazenar fisicamente.
         uint16_t eh_depth;      // Profundidade na árvore. (0 = Nó folha contendo dados reais, >0 = Nó interno de indexação).

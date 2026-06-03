@@ -36,6 +36,24 @@ namespace Ext4::Wrappers {
         uint32_t get_free_blocks_count() const;
 
         /**
+         * @brief Retorna o número do primeiro inode livre nesse grupo.
+         */
+        uint32_t get_first_free_inode(std::span<const std::byte> bitmap_block, uint32_t inodes_per_group) const;
+
+        /**
+         * @brief Retorna o número do primeiro bloco livre nesse grupo.
+         */
+        uint64_t get_first_free_block(std::span<const std::byte> bitmap_block, uint32_t blocks_per_group) const;
+
+        /**
+         * @brief Seta o bit `local_index` no bitmap.
+         * @param bitmap_block O bitmap.
+         * @param local_index A posição do bit.
+         * @param occupied Se o bit ficará ocupado (`true`) ou livre (`false`).
+         */
+        void set_bitmap_bit(std::span<std::byte> bitmap_block, uint32_t local_index, bool occupied);
+
+        /**
          * @brief Retorna a quantidade de inodes livres neste grupo. Para imagens EXT4 de 64 bits, este valor é composto por bg_free_inodes_count_lo e bg_free_inodes_count_hi. Para imagens sem suporte a 64 bits, apenas bg_free_inodes_count_lo é usado.
          * Este valor é exibido em `info` e deve ser decrementado ao alocar inodes para arquivos ou diretórios.
          */
@@ -45,21 +63,37 @@ namespace Ext4::Wrappers {
          * @brief Retorna a quantidade de inodes que são diretórios neste grupo. Para imagens EXT4 de 64 bits, este valor é composto por bg_used_dirs_count_lo e bg_used_dirs_count_hi. Para imagens sem suporte a 64 bits, apenas bg_used_dirs_count_lo é usado.
          * Este valor é exibido em `info` para dar uma ideia da quantidade de diretórios presentes no grupo, mas não é usado para controle de alocação.
          */
-        uint16_t get_used_dirs_count()   const;
+        uint16_t get_used_dirs_count() const;
 
         /**
          * Flags — bg_flags indica se o grupo tem bitmap/inode table inicializados 
          * útil para detectar grupos não inicializados em imagens esparsas ou corrompidas.
          */
-        uint16_t get_flags() const { return raw.bg_flags; }
+        uint16_t get_flags() const { 
+            return raw.bg_flags; 
+        }
 
         /**
-         * Verifica se o bitmap de inodes do grupo está inicializado.
+         * Verifica se o bitmap de inodes do grupo NÃO está inicializado.
          */
-        bool is_inode_uninit() const { return raw.bg_flags  &0x0001; }
+        bool is_inode_uninit() const { 
+            return raw.bg_flags  & Flags::BG_INODE_UNINIT; 
+        }
         /**
-         * Verifica se o bitmap de blocos do grupo está inicializado.
+         * Verifica se o bitmap de blocos do grupo NÃO está inicializado.
          */
-        bool is_block_uninit() const { return raw.bg_flags  &0x0002; }
+        bool is_block_uninit() const { 
+            return raw.bg_flags  & Flags::BG_BLOCK_UNINIT; 
+        }
+
+        /**
+         * @brief Retorna a estrutura interna do GD.
+         */
+        Raw::GroupDescriptor get_raw() const { return raw; }
+
+        /**
+         * @brief Troca a estrutura relacionada.
+         */
+        void set_raw(const Raw::GroupDescriptor &gd) { this->raw = gd; }
     };
 }

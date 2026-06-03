@@ -54,7 +54,7 @@ Wrappers::Image::Image(const std::string &image_path) {
     std::println("Imagem lida com sucesso! Assinatura mágica verificada: 0x{:04X}\nBem-vindo ao EXT4shell!", super_block.s_magic);
 }
 
-void Wrappers::Image::seek(std::streamoff offset) {
+void Wrappers::Image::seek(const std::streamoff offset) {
     this->image_file.clear(); 
 
     this->image_file.seekg(offset, std::ios::beg);
@@ -66,7 +66,7 @@ void Wrappers::Image::seek(std::streamoff offset) {
     }
 }
 
-void Wrappers::Image::read_offset(std::streamoff offset, std::span<std::byte> buffer) {
+void Wrappers::Image::read_offset(const std::streamoff offset, std::span<std::byte> buffer) {
     this->seek(offset);
     
     // Executa a leitura binária convertendo o span de bytes para char*
@@ -85,16 +85,41 @@ void Wrappers::Image::read_offset(std::streamoff offset, std::span<std::byte> bu
     }
 }
 
-void Wrappers::Image::read_block(uint64_t block_num, std::span<std::byte> buffer) {
+void Wrappers::Image::read_block(const uint64_t block_num, std::span<std::byte> buffer) {
     std::streamoff offset = block_num * this->super_block.get_block_size();
     this->read_offset(offset, buffer);
 }
 
-Raw::Inode Wrappers::Image::get_raw_inode(const uint32_t inode_num) {
+void Wrappers::Image::write_offset(const std::streamoff offset, const std::span<const std::byte> buffer) {
+    this->seek(offset);
+    
+    // Executa a leitura binária convertendo o span de bytes para char*
+    this->image_file.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+    
+    std::streamsize read_bytes = this->image_file.gcount();
 
+    if (read_bytes != static_cast<std::streamsize>(buffer.size())) {
+        // Se falhou, limpa o estado de erro para não travar os próximos comandos da aplicação
+        this->image_file.clear(); 
+        
+        throw std::runtime_error(std::format(
+            "Erro ao escrever na imagem: {} bytes lidos, esperados {}. (Offset: {})",
+            read_bytes, buffer.size(), offset
+        ));
+    }
+
+    this->image_file.flush();
+}
+
+void Wrappers::Image::write_block(const uint64_t block_num, const std::span<const std::byte> buffer) {
+    std::streamoff offset = block_num * this->super_block.get_block_size();
+    this->write_offset(offset, buffer);
+}
+
+std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num) {
     // Validação preventiva: Inodes no EXT4 começam obrigatoriamente no índice 1
     if (inode_num == 0 || inode_num > this->super_block.get_inodes_count()) {
-        throw std::runtime_error("Erro: Número de inode inválido ou fora dos limites: " + std::to_string(inode_num));
+        throw std::runtime_error(std::format("Erro: Número de inode inválido ou fora dos limites: {}", inode_num));
     }
 
     // 1. Descobrir a qual Block Group este inode pertence
@@ -109,12 +134,17 @@ Raw::Inode Wrappers::Image::get_raw_inode(const uint32_t inode_num) {
     // 4. Calcular a posição absoluta do inode alvo
     std::streamoff final_inode_offset = table_base_offset + (static_cast<uint64_t>(index) * this->super_block.get_inode_size());
 
-    // 5. Alocar a struct e ler do disco
+    return final_inode_offset;
+}
+
+Raw::Inode Wrappers::Image::get_raw_inode(const uint32_t inode_num) {
+
+    // Alocar a struct e ler do disco
     // ATENÇÃO: Lemos apenas o tamanho físico real indicado pelo superbloco (this->inode_size)
     // para evitar invadir memória de estruturas vizinhas se o sizeof da struct Inode for diferente que o inode_size configurado no superbloco.
     // Aloca um buffer do tamanho real do disco
     std::vector<std::byte> buffer(this->super_block.get_inode_size());
-    this->read_offset(final_inode_offset, Utils::as_span(buffer));
+    this->read_offset(this->get_inode_offset(inode_num), Utils::as_span(buffer));
 
     // Copia apenas o que a struct comporta
     auto inode = Utils::copy_bounded<Raw::Inode>(buffer, static_cast<size_t>(this->super_block.get_inode_size()));
@@ -219,11 +249,13 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
     if (path.empty() || path == "." || this->get_current_path().ends_with(path)) return {base, this->get_current_path()};
     if (path == "/") return {this->get_root_inode(), "/"};
 
-    Wrappers::Inode inode = (path[0] == '/') ? this->get_root_inode() : base;
+    bool is_root = path[0] == '/';
+
+    Wrappers::Inode inode = is_root ? this->get_root_inode() : base;
     std::vector<std::string> paths = Utils::filter_split(path, "/");
     
     // Começamos com o caminho base atual
-    std::string final_path = (path[0] == '/') ? "/" : this->get_current_path();
+    std::string final_path = is_root ? "/" : this->get_current_path();
 
     for (const auto &it : paths) {
         if (inode.get_type() != Flags::S_IFDIR) {

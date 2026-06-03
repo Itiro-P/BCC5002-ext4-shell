@@ -12,22 +12,30 @@ namespace Ext4::Wrappers {
      */
     class Inode {
     private:
-        // O número global do inode, começando em 2 para o diretório raiz.
+        // O número global do raw, começando em 2 para o diretório raiz.
         uint32_t inode_id = 0;
         // O inode encapsulado, contendo os metadados físicos do ficheiro ou diretório.
-        Raw::Inode inode{};
+        Raw::Inode raw{};
 
     public:
         Inode() = default;
         
-        Inode(uint32_t id, const Raw::Inode &inode_data) : inode_id(id), inode(inode_data) {}
+        Inode(uint32_t id, const Raw::Inode &inode_data) : inode_id(id), raw(inode_data) {}
 
         uint32_t get_inode_id() const { return this->inode_id; }
 
-        const Raw::Inode &get_inode() const { return this->inode; }
+        /**
+         * @brief Retorna a estrutura interna do inode.
+         */
+        Raw::Inode get_raw() const { return raw; }
+
+        /**
+         * @brief Troca a estrutura relacionada.
+         */
+        void set_raw(const Raw::Inode &inode) { this->raw = inode; }
 
         uint16_t get_type() const {
-            return static_cast<uint16_t>(this->inode.i_mode  &Constants::S_IFMT);
+            return static_cast<uint16_t>(this->raw.i_mode  &Constants::S_IFMT);
         }
 
         bool is_dir() const {
@@ -39,15 +47,15 @@ namespace Ext4::Wrappers {
         }
 
         uint64_t get_size() const {
-            return (static_cast<uint64_t>(this->inode.i_size_high) << 32) | this->inode.i_size_lo;
+            return (static_cast<uint64_t>(this->raw.i_size_high) << 32) | this->raw.i_size_lo;
         }
 
         uint16_t get_links_count() const { 
-            return this->inode.i_links_count; 
+            return this->raw.i_links_count; 
         }
 
         uint32_t get_flags() const { 
-            return this->inode.i_flags; 
+            return this->raw.i_flags; 
         }
 
         /**
@@ -55,14 +63,14 @@ namespace Ext4::Wrappers {
          * @return `true` se o Inode utiliza extents, ou `false` se utiliza blocos diretos/indiretos.
          */
         bool has_extents() const {
-            return (this->inode.i_flags  &Flags::EXT4_EXTENTS_FL) != 0;
+            return (this->raw.i_flags & Flags::EXT4_EXTENTS_FL) != 0;
         }
 
         /**
-         * @brief Retorna o bloco de dados do inode como um `std::array<std::byte, 60>`.
+         * @brief Retorna o bloco de dados do raw como um `std::array<std::byte, 60>`.
          */
         std::array<std::byte, 60> get_i_block() const {
-            return this->inode.i_block;
+            return this->raw.i_block;
         }
     };
 }

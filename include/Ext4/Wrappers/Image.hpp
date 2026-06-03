@@ -45,7 +45,7 @@ namespace Ext4::Wrappers {
          * @param offset O deslocamento em bytes a partir do início da imagem para onde o ponteiro deve ser movido.
          * @throws `std::runtime_error` Se ocorrer um erro ao tentar posicionar o ponteiro de leitura/escrita.
          */
-        void seek(std::streamoff offset);
+        void seek(const std::streamoff offset);
 
         public:
         /**
@@ -67,12 +67,18 @@ namespace Ext4::Wrappers {
         }
         
         /**
+         * @brief Retorna o offset do inode alvo.
+         * @param inode_um O número do inode.
+         */
+        std::streamoff get_inode_offset(const uint32_t inode_num);
+
+        /**
          * @brief Método auxiliar para ler um offset de dados da imagem, garantindo que a quantidade de bytes lida seja a esperada.
          * @param offset O deslocamento em bytes a partir do início da imagem para onde o ponteiro deve ser movido.
          * @param buffer O buffer onde os dados lidos serão armazenados.
          * @throws `std::runtime_error` Se a quantidade de bytes lida for diferente do esperado ou se ocorrer um erro de leitura.
          */
-        void read_offset(std::streamoff offset, std::span<std::byte> buffer);
+        void read_offset(const std::streamoff offset, std::span<std::byte> buffer);
         
         /**
          * @brief Método auxiliar para ler um bloco de dados da imagem, garantindo que a quantidade de bytes lida seja a esperada.
@@ -80,7 +86,23 @@ namespace Ext4::Wrappers {
          * @param buffer O buffer onde os dados lidos serão armazenados.
          * @throws `std::runtime_error` Se a quantidade de bytes lida for diferente do esperado ou se ocorrer um erro de leitura.
          */
-        void read_block(uint64_t block_num, std::span<std::byte> buffer);
+        void read_block(const uint64_t block_num, std::span<std::byte> buffer);
+
+        /**
+         * @brief Método auxiliar para escrever um offset de dados da imagem, garantindo que a quantidade de bytes escrita seja a esperada.
+         * @param offset O deslocamento em bytes a partir do início da imagem para onde o ponteiro deve ser movido.
+         * @param buffer O buffer onde os dados escritos estão.
+         * @throws `std::runtime_error` Se a quantidade de bytes escrita for diferente do esperado ou se ocorrer um erro de escrita.
+         */
+        void write_offset(const std::streamoff offset, const std::span<const std::byte> buffer);
+        
+        /**
+         * @brief Método auxiliar para escrever um bloco de dados da imagem, garantindo que a quantidade de bytes escrita seja a esperada.
+         * @param block_num O número do bloco a ser escrito.
+         * @param buffer O buffer onde os dados escritos estão.
+         * @throws `std::runtime_error` Se a quantidade de bytes escrita for diferente do esperado ou se ocorrer um erro de leitura.
+         */
+        void write_block(const uint64_t block_num, const std::span<const std::byte> buffer);
 
         /**
          * @brief Retorna o inode root encapsulado em um `Inode`, que fornece métodos de conveniência para acessar os metadados do inode.
@@ -189,5 +211,14 @@ namespace Ext4::Wrappers {
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
         std::vector<uint64_t> read_blocks_from_index(std::span<const std::byte> node_data, const Raw::ExtentHeader &header);
+
+        /**
+         * @brief Cria um diretório e retorna o Inode relacionado a ele.
+         * @param name O (futuro) nome do diretório.
+         * @param parent_inode O ID do inode parente a ele.
+         * @return Um novo Inode já salvo na imagem.
+         * @throws `std::runtime_error` para quaisquers erros graves na execução.
+         */
+        //Wrappers::Inode make_dir(const std::string &name, const uint32_t parent_inode);
     };
 }

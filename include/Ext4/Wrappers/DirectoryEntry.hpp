@@ -22,6 +22,16 @@ namespace Ext4::Wrappers {
         }
 
         /**
+         * @brief Retorna a estrutura crua relacionada.
+         */
+        Raw::DirectoryEntry get_raw() const { return this->raw; }
+
+        /**
+         * @brief Troca a estrutura relacionada.
+         */
+        void set_raw(const Raw::DirectoryEntry &entry) { this->raw = entry; }
+
+        /**
          * @brief Retorna o nome da entrada.
          */
         std::string get_name() const {

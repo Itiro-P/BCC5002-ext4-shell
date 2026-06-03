@@ -133,6 +133,7 @@ short Command::cp(Image &img, const std::vector<std::string> &args) {
 }
 
 short Command::pwd(Image &img) {
+    std::println("{}", img.get_current_path());
     return 0;
 }
 
