@@ -5,6 +5,9 @@
 #include <stdexcept>
 #include <cstring>
 #include <span>
+#include <vector>
+#include <iostream>
+#include <ranges>
 
 using namespace Ext4;
 
@@ -47,6 +50,7 @@ Wrappers::Image::Image(const std::string &image_path) {
         this->group_descriptors.push_back(Wrappers::GroupDescriptor(gd, this->super_block.is_64bit()));
     }
     this->current_inode = this->get_inode(2); // O diretório raiz está sempre no Inode 2.
+    this->root_inode = this->current_inode;
     std::println("Imagem lida com sucesso! Assinatura mágica verificada: 0x{:04X}\nBem-vindo ao EXT4shell!", super_block.s_magic);
 }
 
@@ -211,15 +215,56 @@ std::vector<uint64_t> Wrappers::Image::get_blocks(const Wrappers::Inode &inode) 
     return data_blocks;
 }
 
-Wrappers::Inode Wrappers::Image::resolve_path(const std::string &path, const Wrappers::Inode &base) {
-    if (path == this->current_path) return this->current_inode;
-    else if (path.empty()) return this->current_inode;
-    return this->current_inode;
+std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std::string &path, const Wrappers::Inode &base) {
+    if (path.empty() || path == "." || this->get_current_path().ends_with(path)) return {base, this->get_current_path()};
+    if (path == "/") return {this->get_root_inode(), "/"};
+
+    Wrappers::Inode inode = (path[0] == '/') ? this->get_root_inode() : base;
+    std::vector<std::string> paths = Utils::filter_split(path, "/");
+    
+    // Começamos com o caminho base atual
+    std::string final_path = (path[0] == '/') ? "/" : this->get_current_path();
+
+    for (const auto &it : paths) {
+        if (inode.get_type() != Flags::S_IFDIR) {
+            std::println(std::cerr, "Erro: O componente {} não é um diretório.", it);
+            return {base, this->get_current_path()};
+        }
+        auto entries = this->list_dir(inode);
+        bool found = false;
+        for (const auto &entry : entries) {
+            if (entry.get_name() == it) {
+                inode = this->get_inode(entry.get_inode());
+                found = true;
+
+                if (it == "..") {
+                    size_t last_slash = final_path.find_last_of('/');
+                    if (last_slash != std::string::npos && last_slash > 0) {
+                        final_path = final_path.substr(0, last_slash);
+                    } else {
+                        final_path = "/";
+                    }
+                } else if (it != ".") {
+                    if (final_path.back() != '/') final_path += "/";
+                    final_path += entry.get_name();
+                }
+
+                break; 
+            }
+        }
+
+        if (!found) {
+            std::println(std::cerr, "Erro: O componente {} não existe.", it);
+            return {base, this->get_current_path()};
+        }
+    }
+
+    return {inode, final_path};
 }
 
 std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::Inode &inode) {
     std::vector<Wrappers::DirectoryEntry> entries{};
-    if(inode.get_type() != Flags::S_IFDIR) return entries;
+    if(!inode.is_dir()) return entries;
     
     auto bytes = this->read_file(inode);
     size_t offset = 0;

@@ -16,6 +16,9 @@ namespace Ext4::Wrappers {
         // A imagem carrega um arquivo de imagem de disco e mantém um fluxo de leitura e escrita.
         std::fstream image_file;
 
+        // O Inode raíz (/).
+        Wrappers::Inode root_inode;
+
         // O inode atual, começando no diretório raiz (Inode 2).
         Wrappers::Inode current_inode;
 
@@ -80,18 +83,42 @@ namespace Ext4::Wrappers {
         void read_block(uint64_t block_num, std::span<std::byte> buffer);
 
         /**
+         * @brief Retorna o inode root encapsulado em um `Inode`, que fornece métodos de conveniência para acessar os metadados do inode.
+         * @return O `Inode` do inode atual.
+         */
+        Wrappers::Inode get_root_inode() const {
+            return this->root_inode;
+        }
+
+        /**
          * @brief Retorna o inode atual encapsulado em um `Inode`, que fornece métodos de conveniência para acessar os metadados do inode.
          * @return O `Inode` do inode atual.
          */
-        Wrappers::Inode get_current_inode() const& {
+        Wrappers::Inode get_current_inode() const {
             return this->current_inode;
+        }
+
+        /**
+         * @brief Altera o inode atual da imagem para o especificado.
+         * @param inode o inode.
+         */
+        void set_current_inode(const Wrappers::Inode &inode) {
+            this->current_inode = inode;
+        }
+
+        /**
+         * @brief Altera o caminho atual da imagem para o especificado.
+         * @param str o caminho.
+         */
+        void set_current_path(const std::string &str) {
+            this->current_path= str;
         }
 
         /**
          * @brief Retorna o caminho do diretório atual como uma string. O caminho é atualizado conforme o usuário navega pelo sistema de arquivos.
          * @return O caminho do diretório atual.
          */
-        std::string get_current_path() const& {
+        std::string get_current_path() const {
             return this->current_path;
         }
 
@@ -111,7 +138,7 @@ namespace Ext4::Wrappers {
          * @return O Inode relacionado ao diretório alvo.
          * @throws `std::runtime_error` para quaisquers erros que ocorram na execução.
          */
-        Wrappers::Inode resolve_path(const std::string &path, const Wrappers::Inode &base);
+        std::pair<Wrappers::Inode, std::string> resolve_path(const std::string &path, const Wrappers::Inode &base);
 
         /**
          * @brief Lê os metadados de um inode específico do disco a partir do seu número global.

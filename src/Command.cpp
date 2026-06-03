@@ -49,17 +49,20 @@ short Command::cd(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
     
-    // necessário implementar
-
+    auto [inode, path] = img.resolve_path(target_path, img.get_current_inode());
+    if(!img.get_current_path().ends_with(path)) {
+        img.set_current_inode(inode);
+        img.set_current_path(path);
+    }
     return 0;
 }
 
 short Command::ls(Image &img, const std::vector<std::string> &args) {
-    const std::string target_path = args.empty() ? args[1] : img.get_current_path();
-    Wrappers::Inode cur = img.get_current_inode();
+    const std::string target_path = args.size() > 1 ? args[1] : img.get_current_path();
+    auto [cur, path] = img.resolve_path(target_path, img.get_current_inode());
     auto entries = img.list_dir(cur);
     for(const auto &entry: entries) {
-        std::println("{}", entry.get_name());
+        std::println("{}{}", entry.get_name(), entry.is_dir() ? "/" : "");
     }
     return 0;
 }

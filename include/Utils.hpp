@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <stdexcept>
 #include <span>
+#include <vector>
+#include <ranges>
 #include <algorithm>
 
 /**
@@ -128,5 +130,29 @@ namespace Utils {
      */
     inline constexpr auto as_span(const Object auto &o) {
         return std::span(reinterpret_cast<const std::byte*>(&o), sizeof(o));
+    }
+
+    /**
+     * @brief Separa (tokeniza) um `std::string` em um vetor de strings usando como base um delimitador.
+     * @param str A string alvo.
+     * @param delimiter O delimitador, por padrão é um espaço (` `).
+     */
+    inline constexpr std::vector<std::string> filter_split(const std::string &str, const std::string& delimiter = " ") {
+        // Usamos ranges para dividir a string em pedaços menores, usando delimiter como delimitador.
+        // Colocamos a string alvo em um std::string_view para evitar cópias desnecessárias, e depois transformamos cada argumento em std::string.
+        return str | 
+        // Quebramos a linha em tokens
+        std::views::split(delimiter) | 
+        // Eliminamos (filtramos) as strings vazias ou que contenham apenas espaços.
+        std::views::filter([](auto&& arg) { 
+            return !arg.empty() && std::none_of(arg.begin(), arg.end(), isspace); 
+        }) | 
+        // Transformamos cada argumento em uma string normal.
+        std::views::transform([](auto&& arg) { 
+            return std::string(arg.begin(), arg.end()); 
+        }) |
+        // E colocamos em um vetor de strings.
+        std::ranges::to<std::vector>();
+
     }
 };

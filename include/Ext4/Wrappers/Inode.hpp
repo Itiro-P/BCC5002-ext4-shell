@@ -30,6 +30,14 @@ namespace Ext4::Wrappers {
             return static_cast<uint16_t>(this->inode.i_mode  &Constants::S_IFMT);
         }
 
+        bool is_dir() const {
+            return this->get_type() == Flags::S_IFDIR;
+        }
+
+        bool is_file() const {
+            return this->get_type() == Flags::S_IFREG;
+        }
+
         uint64_t get_size() const {
             return (static_cast<uint64_t>(this->inode.i_size_high) << 32) | this->inode.i_size_lo;
         }

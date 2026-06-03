@@ -1,7 +1,6 @@
 #include "../include/Shell.hpp"
 #include <iostream>
 #include <vector>
-#include <ranges>
 
 short Shell::run() {
     std::string line;
@@ -13,21 +12,7 @@ short Shell::run() {
 
         if (!std::getline(std::cin, line)) break;  // EOF (Ctrl+D)
 
-        // Usamos ranges para dividir a string de comando em argumentos, usando o espaço como delimitador.
-        // Colocamos a string alvo, em um std::string_view para evitar cópias desnecessárias, e depois transformamos cada argumento em std::string.
-        std::vector<std::string> args = line | 
-            // Quebramos a linha em argumentos
-            std::views::split(' ') | 
-            // Eliminamos (filtramos) os argumentos vazios ou que contenham apenas espaços.
-            std::views::filter([](auto&& arg) { 
-                return !arg.empty() && std::none_of(arg.begin(), arg.end(), isspace); 
-            }) | 
-            // Transformamos cada argumento em uma string normal.
-            std::views::transform([](auto&& arg) { 
-                return std::string(arg.begin(), arg.end()); 
-            }) |
-            // E colocamos em um vetor de strings.
-            std::ranges::to<std::vector>();
+        std::vector<std::string> args = Utils::filter_split(line);
 
         if (args.empty()) continue;
 
