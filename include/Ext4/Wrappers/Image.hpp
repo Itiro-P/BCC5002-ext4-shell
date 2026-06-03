@@ -23,13 +23,10 @@ namespace Ext4::Wrappers {
         std::string current_path = "/";
 
         // O superbloco lido da imagem, armazenado para uso futuro.
-        Raw::SuperBlock super_block;
+        Wrappers::SuperBlock super_block;
 
         // O vetor contendo a tabela de descritores de grupos, lida a partir do próximo bloco após o superbloco.
-        std::vector<Raw::GroupDescriptor> group_descriptors;
-
-        // Se estamos em um sistema de arquivos com suporte a 64 bits.
-        bool is_64;
+        std::vector<Wrappers::GroupDescriptor> group_descriptors;
 
         // O vetor contendo os bitmaps dos blocos.
         std::vector<uint64_t> block_bitmaps;
@@ -39,24 +36,6 @@ namespace Ext4::Wrappers {
 
         // O vetor contendo os offsets dos inodes.
         std::vector<uint64_t> inode_table_offsets;
-
-        // O tamanho de um bloco.
-        uint32_t block_size;
-
-        // O número de blocos.
-        uint64_t block_count;
-
-        // O tamanho de um inode.
-        uint32_t inode_size;
-
-        // O número de inodes.
-        uint32_t inode_count;
-
-        // Números de blocos por grupo.
-        uint32_t blocks_per_group;
-
-        // Números de inodes por grupo.
-        uint32_t inodes_per_group;
         
         /**
          * @brief Método auxiliar para posicionar o ponteiro de leitura/escrita da imagem em um offset específico a partir do início.
@@ -71,15 +50,15 @@ namespace Ext4::Wrappers {
          * @param image_path O caminho para o arquivo de imagem a ser aberto.
          * @throws `std::runtime_error` Se o arquivo não puder ser aberto ou se o superbloco não for válido (assinatura mágica incorreta).
          */
-        explicit Image(const std::string& image_path);
+        explicit Image(const std::string &image_path);
 
         // Desabilita a cópia para evitar problemas de gerenciamento de recursos.
         Image(const Image&) = delete;
-        Image& operator=(const Image&) = delete;
+        Image &operator=(const Image&) = delete;
         
         // Permite a movimentação para facilitar o gerenciamento de recursos.
         Image(Image&&) = default;
-        Image& operator=(Image&&) = default;
+        Image &operator=(Image&&) = default;
         ~Image() { 
             if (image_file.is_open()) image_file.close(); 
         }
@@ -117,6 +96,24 @@ namespace Ext4::Wrappers {
         }
 
         /**
+         * @brief Retorna uma lista de entradas de um inode.
+         * @param inode o Inode a ser listado.
+         * @return Uma lista de entradas.
+         * @throws `std::runtime_error` para quaisquer erros durante a execução.
+         */
+        std::vector<Wrappers::DirectoryEntry> list_dir(const Wrappers::Inode &inode);
+
+        /**
+         * @brief Resolve o diretório alvo e encontra o inode relacionado e ele.
+         * Se `path` for vazio, inode do diretório atual da imagem é retornado.
+         * @param path O diretório alvo.
+         * @param base o Inode base a ser o alvo inicial de procura.
+         * @return O Inode relacionado ao diretório alvo.
+         * @throws `std::runtime_error` para quaisquers erros que ocorram na execução.
+         */
+        Wrappers::Inode resolve_path(const std::string &path, const Wrappers::Inode &base);
+
+        /**
          * @brief Lê os metadados de um inode específico do disco a partir do seu número global.
          * @param inode_num Número do inode (ex: 2 para o diretório raiz).
          * @return Estrutura preenchida com os dados do disco Inode.
@@ -138,7 +135,7 @@ namespace Ext4::Wrappers {
          * @return Um vetor de números de blocos alocados para este Inode.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<uint64_t> get_blocks(Wrappers::Inode& inode);
+        std::vector<uint64_t> get_blocks(const Wrappers::Inode &inode);
 
         /**
          * @brief Lê os dados do Inode a partir dos blocos alocados. Esta função irá ler os blocos físicos correspondentes aos dados do Inode e concatená-los para retornar o conteúdo completo do ficheiro ou diretório.
@@ -146,25 +143,24 @@ namespace Ext4::Wrappers {
          * @return Um vetor de bytes contendo os dados lidos.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<std::byte> read_file(const Wrappers::Inode& inode);
+        std::vector<std::byte> read_file(const Wrappers::Inode &inode);
 
         /**
          * @brief Lê os blocos de dados diretamente de um nó folha da árvore de extents. Deve ser chamado apenas quando `eh_depth == 0`.
-         * @param inode O Inode que contém o nó de extents a ser lido. Necessário para acessar os dados do bloco de extents.
+         * @param node_data Os dados do nó de extents a ser lido.
          * @param header O cabeçalho do nó de extents, necessário para determinar quantas entradas de blocos existem.
          * @return Um vetor de números de blocos físicos alocados para os dados deste nó folha.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<uint64_t> read_blocks_from_leafs(const Wrappers::Inode& inode, const Raw::ExtentHeader& header);
+        std::vector<uint64_t> read_blocks_from_leafs(std::span<const std::byte> node_data, const Raw::ExtentHeader &header);
 
         /**
          * @brief Lê os blocos de dados a partir de um nó interno de indexação da árvore de extents. Deve ser chamado apenas quando `eh_depth > 0`.
-         * @param inode O Inode que contém o nó de extents a ser lido. Necessário para acessar os dados do bloco de extents.
-         * @param index_block O número do bloco de índice a ser lido.
-         * @param depth A profundidade da árvore de extents.
+         * @param node_data Os dados do nó de extents a ser lido.
+         * @param header O cabeçalho do nó de extents, necessário para determinar quantas entradas de blocos existem.
          * @return Um vetor de números de blocos físicos alocados para os dados indexados por este nó interno.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<uint64_t> read_blocks_from_index(const Wrappers::Inode& inode, const uint64_t index_block, const uint16_t depth);
+        std::vector<uint64_t> read_blocks_from_index(std::span<const std::byte> node_data, const Raw::ExtentHeader &header);
     };
 }

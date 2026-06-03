@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include <span>
 #include "../../Ext4/Raw.hpp"
 
 namespace Ext4::Wrappers {
@@ -19,14 +20,14 @@ namespace Ext4::Wrappers {
     public:
         Inode() = default;
         
-        Inode(uint32_t id, const Raw::Inode& inode_data) : inode_id(id), inode(inode_data) {}
+        Inode(uint32_t id, const Raw::Inode &inode_data) : inode_id(id), inode(inode_data) {}
 
         uint32_t get_inode_id() const { return this->inode_id; }
 
-        const Raw::Inode& get_inode() const { return this->inode; }
+        const Raw::Inode &get_inode() const { return this->inode; }
 
         uint16_t get_type() const {
-            return static_cast<uint16_t>(this->inode.i_mode & Constants::S_IFMT);
+            return static_cast<uint16_t>(this->inode.i_mode  &Constants::S_IFMT);
         }
 
         uint64_t get_size() const {
@@ -46,9 +47,12 @@ namespace Ext4::Wrappers {
          * @return `true` se o Inode utiliza extents, ou `false` se utiliza blocos diretos/indiretos.
          */
         bool has_extents() const {
-            return (this->inode.i_flags & Flags::EXT4_EXTENTS_FL) != 0;
+            return (this->inode.i_flags  &Flags::EXT4_EXTENTS_FL) != 0;
         }
 
+        /**
+         * @brief Retorna o bloco de dados do inode como um `std::array<std::byte, 60>`.
+         */
         std::array<std::byte, 60> get_i_block() const {
             return this->inode.i_block;
         }
