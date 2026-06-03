@@ -38,39 +38,37 @@ namespace Ext4::Wrappers {
             return static_cast<uint16_t>(this->raw.i_mode  &Constants::S_IFMT);
         }
 
-        bool is_dir() const {
-            return this->get_type() == Flags::S_IFDIR;
-        }
+        uint16_t get_mode() const { return this->raw.i_mode; }
 
-        bool is_file() const {
-            return this->get_type() == Flags::S_IFREG;
-        }
+        uint16_t get_uid() const { return this->raw.i_uid; }
 
-        uint64_t get_size() const {
-            return (static_cast<uint64_t>(this->raw.i_size_high) << 32) | this->raw.i_size_lo;
-        }
+        uint16_t get_gid() const { return this->raw.i_gid; }
 
-        uint16_t get_links_count() const { 
-            return this->raw.i_links_count; 
-        }
+        uint32_t get_atime() const { return this->raw.i_atime; }
 
-        uint32_t get_flags() const { 
-            return this->raw.i_flags; 
-        }
+        uint32_t get_ctime() const { return this->raw.i_ctime; }
+
+        uint32_t get_mtime() const { return this->raw.i_mtime; }
+
+        bool is_dir() const { return this->get_type() == Flags::S_IFDIR; }
+
+        bool is_file() const { return this->get_type() == Flags::S_IFREG; }
+
+        uint64_t get_size() const { return (static_cast<uint64_t>(this->raw.i_size_high) << 32) | this->raw.i_size_lo; }
+
+        uint16_t get_links_count() const { return this->raw.i_links_count; }
+
+        uint32_t get_flags() const { return this->raw.i_flags; }
 
         /**
          * @brief Verifica se o Inode utiliza a estrutura de árvore de extents para mapear os blocos de dados, ou se utiliza o esquema tradicional de blocos diretos/indiretos.
          * @return `true` se o Inode utiliza extents, ou `false` se utiliza blocos diretos/indiretos.
          */
-        bool has_extents() const {
-            return (this->raw.i_flags & Flags::EXT4_EXTENTS_FL) != 0;
-        }
+        bool has_extents() const { return (this->raw.i_flags & Flags::EXT4_EXTENTS_FL) != 0; }
 
         /**
          * @brief Retorna o bloco de dados do raw como um `std::array<std::byte, 60>`.
          */
-        std::array<std::byte, 60> get_i_block() const {
-            return this->raw.i_block;
-        }
+        std::array<std::byte, 60> get_i_block() const { return this->raw.i_block; }
     };
 }

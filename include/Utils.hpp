@@ -153,6 +153,23 @@ namespace Utils {
         }) |
         // E colocamos em um vetor de strings.
         std::ranges::to<std::vector>();
+    }
 
+    /**
+     * @brief Retorna `true` se o bit está ativo. `false` caos contrário.
+     */
+    inline constexpr bool test_bit(const std::span<const std::byte> bitmap_block, const uint32_t idx) {
+        return ((reinterpret_cast<const uint8_t*>(bitmap_block.data())[idx/8] >> (idx % 8)) & 1) == 1;
+    }
+
+    /**
+     * @brief Seta o bit de um bitmap na posição `idx` como 0 ou 1.
+     * @param bitmap_block O bloco de bitmap.
+     * @param idx O índice do bit.
+     * @param val `true` se forçar ativação. `false` caso contrário.
+     */
+    inline constexpr void set_bit(std::span<std::byte> bitmap_block, const uint32_t idx, const bool val) {       
+        if (val) reinterpret_cast<uint8_t*>(bitmap_block.data())[idx/8] |= (1 << idx%8);  // Força o bit a virar 1
+        else reinterpret_cast<uint8_t*>(bitmap_block.data())[idx/8] &= ~(1 << idx%8); // Força o bit a virar 0
     }
 };

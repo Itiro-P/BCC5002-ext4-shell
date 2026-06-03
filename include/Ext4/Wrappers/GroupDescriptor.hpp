@@ -36,24 +36,6 @@ namespace Ext4::Wrappers {
         uint32_t get_free_blocks_count() const;
 
         /**
-         * @brief Retorna o número do primeiro inode livre nesse grupo.
-         */
-        uint32_t get_first_free_inode(std::span<const std::byte> bitmap_block, uint32_t inodes_per_group) const;
-
-        /**
-         * @brief Retorna o número do primeiro bloco livre nesse grupo.
-         */
-        uint64_t get_first_free_block(std::span<const std::byte> bitmap_block, uint32_t blocks_per_group) const;
-
-        /**
-         * @brief Seta o bit `local_index` no bitmap.
-         * @param bitmap_block O bitmap.
-         * @param local_index A posição do bit.
-         * @param occupied Se o bit ficará ocupado (`true`) ou livre (`false`).
-         */
-        void set_bitmap_bit(std::span<std::byte> bitmap_block, uint32_t local_index, bool occupied);
-
-        /**
          * @brief Retorna a quantidade de inodes livres neste grupo. Para imagens EXT4 de 64 bits, este valor é composto por bg_free_inodes_count_lo e bg_free_inodes_count_hi. Para imagens sem suporte a 64 bits, apenas bg_free_inodes_count_lo é usado.
          * Este valor é exibido em `info` e deve ser decrementado ao alocar inodes para arquivos ou diretórios.
          */

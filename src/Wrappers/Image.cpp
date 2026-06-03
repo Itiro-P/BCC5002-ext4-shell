@@ -280,8 +280,7 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
                     if (final_path.back() != '/') final_path += "/";
                     final_path += entry.get_name();
                 }
-
-                break; 
+                break;
             }
         }
 
@@ -297,7 +296,6 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
 std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::Inode &inode) {
     std::vector<Wrappers::DirectoryEntry> entries{};
     if(!inode.is_dir()) return entries;
-    
     auto bytes = this->read_file(inode);
     size_t offset = 0;
 
