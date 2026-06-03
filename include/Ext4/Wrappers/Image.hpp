@@ -220,5 +220,25 @@ namespace Ext4::Wrappers {
          * @throws `std::runtime_error` para quaisquers erros graves na execução.
          */
         //Wrappers::Inode make_dir(const std::string &name, const uint32_t parent_inode);
+
+        /**
+         * @brief Escreve um inode no disco.
+         * @param inode_num O número do inode.
+         * @param inode A estrutura `inode`.
+         */
+        void write_inode(const uint32_t inode_num, const Raw::Inode &inode);
+
+        /**
+         * @brief Escreve um grupo de descritores no disco.
+         * @param inode_num O número do GroupDescriptor.
+         * @param gd A estrutura GroupDescriptor.
+         */
+        void write_gdt(uint32_t group, const Raw::GroupDescriptor &gd);
+
+        /**
+         * @brief Escreve um superbloco no disco.
+         * @param sp A estrutura SuperBlock.
+         */
+        void write_superblock(const Raw::SuperBlock &sp);
     };
 }

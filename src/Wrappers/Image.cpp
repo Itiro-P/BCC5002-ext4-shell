@@ -129,7 +129,7 @@ std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num)
     uint32_t index = (inode_num - 1) % this->super_block.get_inodes_per_group();
 
     // 3. Buscar o offset em bytes de onde começa a tabela de inodes do grupo correspondente
-    uint64_t table_base_offset = this->inode_table_offsets.at(group);
+    uint64_t table_base_offset = this->inode_table_offsets[group];
 
     // 4. Calcular a posição absoluta do inode alvo
     std::streamoff final_inode_offset = table_base_offset + (static_cast<uint64_t>(index) * this->super_block.get_inode_size());
@@ -317,4 +317,20 @@ std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::
         offset += entry.rec_len;
     }
     return entries;
+}
+
+void Ext4::Wrappers::Image::write_inode(const uint32_t inode_num, const Raw::Inode &inode) {
+    std::streamoff offset = this->get_inode_offset(inode_num);
+    this->write_offset(offset, Utils::as_span(inode));
+}
+
+void Ext4::Wrappers::Image::write_gdt(uint32_t group, const Raw::GroupDescriptor &gd) {
+    std::streamoff offset = this->super_block.get_gdt_offset() + (static_cast<uint64_t>(group) * this->super_block.get_desc_size());
+    this->write_offset(offset, Utils::as_span(gd));
+    this->group_descriptors[group] = Wrappers::GroupDescriptor(gd, this->super_block.is_64bit());
+}
+
+void Ext4::Wrappers::Image::write_superblock(const Raw::SuperBlock &sp) {
+    this->write_offset(Constants::SUPERBLOCK_OFFSET, Utils::as_span(sp));
+    this->super_block = Wrappers::SuperBlock(sp);
 }
