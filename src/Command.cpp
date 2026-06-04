@@ -24,9 +24,7 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    size_t bar = file_path.find_last_of("/");
-    std::string path = (bar == std::string::npos) ? "" : file_path.substr(0, bar);
-    std::string filename = (bar == std::string::npos) ? file_path : file_path.substr(bar + 1);
+    auto [path, filename] = Utils::split_path(file_path);
 
     auto [inode, resolved_path] = img.resolve_path(path, img.get_current_inode());
     auto entries = img.list_dir(inode);
@@ -169,8 +167,37 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    // necessário implementar
+    auto [path, filename] = Utils::split_path(file_path);
 
+    auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
+
+    uint32_t new_inode_id = img.alloc_inode();
+
+    // Inicializa o inode
+    Raw::Inode new_inode{};
+    new_inode.i_mode      = Flags::InodeMode::S_IFREG | 0644;  // arquivo regular + permissões 644
+    new_inode.i_links_count = 1;
+    new_inode.i_size_lo   = 0;
+    new_inode.i_size_hi   = 0;
+    new_inode.i_flags     = Flags::InodeFlags::EXT4_EXTENTS_FL;  // EXT4_EXTENTS_FL
+
+    // Timestamps
+    uint32_t now = static_cast<uint32_t>(std::time(nullptr));
+    new_inode.i_atime = now;
+    new_inode.i_mtime = now;
+    new_inode.i_ctime = now;
+
+    // Inicializa extent header dentro do i_block
+    Raw::ExtentHeader eh{};
+    eh.eh_magic   = Constants::EXTENT_MAGIC;
+    eh.eh_entries = 0;
+    eh.eh_max     = 4;  // cabe 4 extents diretos no i_block
+    eh.eh_depth   = 0;    
+    Utils::write_to(new_inode.i_block, eh);
+
+    img.write_inode(new_inode_id, new_inode);
+
+    img.dir_add_entry(parent_dir.get_inode_id(), new_inode_id, filename, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
     return 0;
 }
 
@@ -195,7 +222,24 @@ short Command::rm(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    // necessário implementar
+    auto [path, filename] = Utils::split_path(file_path);
+
+    auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
+    
+    // Cria a view filtrada
+    auto target_file = img.list_dir(parent_dir) | std::views::filter([&](const auto& entry) {
+        return entry.get_name() == filename;
+    });
+
+    // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
+    if (std::ranges::empty(target_file)) {
+        std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", filename);
+        return 1;
+    }
+
+    Wrappers::DirectoryEntry file = *target_file.begin();
+
+    img.dir_remove_entry(parent_dir.get_inode_id(), filename);
 
     return 0;
 }

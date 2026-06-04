@@ -8,6 +8,8 @@
 #include <vector>
 #include <iostream>
 #include <ranges>
+#include <algorithm>
+#include <tuple>
 
 using namespace Ext4;
 
@@ -36,17 +38,11 @@ Wrappers::Image::Image(const std::string &image_path) {
     uint32_t group_count = this->super_block.get_group_count();
     uint16_t desc_size = this->super_block.get_desc_size();
 
-    this->inode_table_offsets.clear();
-
     for (uint32_t i = 0; i < group_count; i++) {
         Raw::GroupDescriptor gd{};
         std::streamoff offset = gdt_offset + (static_cast<uint64_t>(i) * desc_size);
         this->read_offset(offset, Utils::as_span(gd));
-        // Recupera o endereço base do bloco da tabela de inodes deste grupo
-        uint64_t inode_table_block = this->super_block.is_64bit() ? Utils::concatenate(gd.bg_inode_table_lo, gd.bg_inode_table_hi) : gd.bg_inode_table_lo;
-        
-        // Converte o endereço de blocos para um offset absoluto em bytes e armazena
-        this->inode_table_offsets.push_back(inode_table_block * this->super_block.get_block_size());
+
         this->group_descriptors.push_back(Wrappers::GroupDescriptor(gd, this->super_block.is_64bit()));
     }
     this->current_inode = this->get_inode(2); // O diretório raiz está sempre no Inode 2.
@@ -92,19 +88,13 @@ void Wrappers::Image::read_block(const uint64_t block_num, std::span<std::byte> 
 
 void Wrappers::Image::write_offset(const std::streamoff offset, const std::span<const std::byte> buffer) {
     this->seek(offset);
-    
-    // Executa a leitura binária convertendo o span de bytes para char*
     this->image_file.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
-    
-    std::streamsize read_bytes = this->image_file.gcount();
 
-    if (read_bytes != static_cast<std::streamsize>(buffer.size())) {
-        // Se falhou, limpa o estado de erro para não travar os próximos comandos da aplicação
-        this->image_file.clear(); 
-        
+    if (!this->image_file) {
+        this->image_file.clear();
         throw std::runtime_error(std::format(
-            "Erro ao escrever na imagem: {} bytes lidos, esperados {}. (Offset: {})",
-            read_bytes, buffer.size(), offset
+            "Erro ao escrever na imagem: falha na escrita. (Offset: {})",
+            offset
         ));
     }
 
@@ -145,11 +135,15 @@ std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num)
     uint32_t index = this->get_inode_bit_pos(inode_num);
 
     // 3. Buscar o offset em bytes de onde começa a tabela de inodes do grupo correspondente
-    uint64_t table_base_offset = this->inode_table_offsets[group];
+    //uint64_t table_base_offset = this->group_descriptors[group].get_inode_table_block();
 
     // 4. Calcular a posição absoluta do inode alvo
-    std::streamoff final_inode_offset = table_base_offset + (static_cast<uint64_t>(index) * this->super_block.get_inode_size());
+    //std::streamoff final_inode_offset = table_base_offset + (static_cast<uint64_t>(index) * this->super_block.get_inode_size());
 
+    uint64_t table_base_offset = this->group_descriptors[group].get_inode_table_block()
+                           * this->super_block.get_block_size();
+
+std::streamoff final_inode_offset = table_base_offset + (static_cast<uint64_t>(index) * this->super_block.get_inode_size());
     return final_inode_offset;
 }
 
@@ -351,6 +345,19 @@ void Ext4::Wrappers::Image::write_superblock(const Raw::SuperBlock &sp) {
     this->super_block = Wrappers::SuperBlock(sp);
 }
 
+uint64_t Ext4::Wrappers::Image::get_absolute_block_offset(const Wrappers::Inode &inode, const uint32_t relative_offset) {
+    // Traduz o offset lógico do arquivo para o offset absoluto em bytes do disco físico
+    size_t block_size = this->super_block.get_block_size();
+    size_t block_index = relative_offset / block_size;
+    size_t offset_within_block = relative_offset % block_size;
+
+    // Busca o bloco físico correspondente
+    uint64_t phys_block_num = this->get_blocks(inode)[block_index];
+    uint64_t last_entry_phys_offset = (phys_block_num * block_size) + offset_within_block;
+
+    return last_entry_phys_offset;
+}
+
 uint32_t Ext4::Wrappers::Image::alloc_inode() {
     bool stop = false;
     auto &gds = this->group_descriptors;
@@ -479,4 +486,130 @@ void Ext4::Wrappers::Image::free_block(const uint32_t blk) {
 
     to_change.set_raw(new_raw);
     this->write_gdt(group, new_raw);
+}
+
+void Ext4::Wrappers::Image::dir_add_entry(const uint32_t dir_ino, uint32_t target_ino, const std::string &name, const uint8_t file_type) {
+    if (dir_ino < 1 || target_ino < 1 || name.empty()) return;
+
+    // Pegamos a representação do Inode do Pai
+    Wrappers::Inode dir_inode = this->get_inode(dir_ino);
+    
+    // Listamos as entradas do PAI
+    auto entries = this->list_dir(dir_inode);
+    if (entries.empty()) throw std::runtime_error("Diretório pai corrompido ou vazio.");
+
+
+    // Vamos descobrir onde a última entrada começa acumulando o rec_len de todas as anteriores
+    uint64_t last_entry_logical_offset = std::ranges::fold_left(entries 
+        | std::views::take(entries.size() - 1) // Ignora a última para não ser calculada em excesso.
+        | std::views::transform([&](Wrappers::DirectoryEntry &entry){ return entry.get_raw().rec_len; }),
+        0, std::plus<uint64_t>{});
+
+    // A última entrada da lista é quem vamos espremer
+    Wrappers::DirectoryEntry last_entry = entries.back();
+
+    uint64_t last_entry_phys_offset = this->get_absolute_block_offset(dir_inode, last_entry_logical_offset);
+
+    // Atualizar a antiga última entrada (Modo Escrita)
+    Raw::DirectoryEntry last_raw = last_entry.get_raw();
+    uint16_t old_total_rec_len = last_raw.rec_len;
+    
+    // Ela encolhe para o seu tamanho real usado
+    last_raw.rec_len = static_cast<uint16_t>(last_entry.get_used_size()); 
+    
+    // Grava a última entrada modificada de volta exatamente na sua posição
+    this->write_offset(last_entry_phys_offset, Utils::as_span(last_raw));
+
+    // Criar a nova entrada logo em seguida
+    Raw::DirectoryEntry new_raw{
+        .inode = target_ino,
+        // Ela herda o resto do espaço alocado antigo que sobrou do bloco
+        .rec_len = static_cast<uint16_t>(old_total_rec_len - last_raw.rec_len),
+        .name_len = static_cast<uint8_t>(name.size()),
+        .file_type = file_type
+    };
+
+    // O offset físico da nova entrada será logo após o término do rec_len da que acabamos de atualizar
+    uint64_t new_entry_phys_offset = last_entry_phys_offset + last_raw.rec_len;
+
+    // Grava o cabeçalho da nova entrada no disco
+    this->write_offset(new_entry_phys_offset, Utils::as_span(new_raw));
+    
+    // Grava a string do nome logo após o cabeçalho dela (avançando os 8 bytes da struct)
+    this->write_offset(new_entry_phys_offset + sizeof(Raw::DirectoryEntry), Utils::as_span(name));
+}
+
+void Ext4::Wrappers::Image::dir_remove_entry(const uint32_t dir_ino, const std::string &name) {
+    if (name == "." || name == "..") {
+        std::println("Tentativa de remoção de entrada proibida: {}.", name);
+        return;
+    } if (name.empty() || dir_ino < 1) {
+        std::println("Entrada vazia/inválida.");
+        return;
+    }
+
+    Wrappers::Inode dir_inode = this->get_inode(dir_ino);
+
+    auto entries = this->list_dir(dir_inode);
+
+    if (entries.front().get_name() == name) {
+        Raw::DirectoryEntry first_raw = entries.front().get_raw();
+        first_raw.inode = 0;
+        this->write_offset(
+            this->get_absolute_block_offset(dir_inode, 0),
+            Utils::as_span(first_raw)
+        );
+        this->free_inode(first_raw.inode);
+        for (const auto &blk : this->get_blocks(this->get_inode(first_raw.inode))) {
+            this->free_block(blk);
+        }
+        return;
+    }
+
+
+    auto [before_target, target] = *(entries 
+    | std::views::adjacent<2> 
+    | std::views::filter([&](const auto& p) { return std::get<1>(p).get_name() == name; })
+    ).begin();
+
+    uint64_t last_before_entry_logical_offset = std::ranges::fold_left(entries 
+    | std::views::take_while([&](const Wrappers::DirectoryEntry &entry) { 
+        return entry.get_name() != before_target.get_name(); // Para ANTES do before_target
+    })
+    | std::views::transform([&](const Wrappers::DirectoryEntry &entry){ return entry.get_raw().rec_len; }),
+    0, std::plus<uint64_t>{});
+
+    uint64_t last_before_entry_absolute_offset = this->get_absolute_block_offset(dir_inode, last_before_entry_logical_offset);
+
+    Raw::DirectoryEntry new_before_target = before_target.get_raw();
+    new_before_target.rec_len += target.get_raw().rec_len;
+
+    auto target_inode_wrapper = this->get_inode(target.get_inode());
+    Raw::Inode raw_target_inode = target_inode_wrapper.get_raw();
+
+    // Decrementa o link do próprio arquivo que está sendo removido
+    raw_target_inode.i_links_count--; 
+
+    if (raw_target_inode.i_links_count == 0) {
+        // Se ninguém mais aponta para ele, limpa do mapa!
+        this->free_inode(target.get_inode());
+        for (const auto &blk : this->get_blocks(target_inode_wrapper)) {
+            this->free_block(blk);
+        }
+    } else {
+        // Se ainda há outros hard links, apenas atualiza o inode dele com o link decrementado
+        this->write_inode(target.get_inode(), raw_target_inode);
+    }
+
+    // Grava o cabeçalho da "nova" entrada no disco
+    this->write_offset(last_before_entry_absolute_offset, Utils::as_span(new_before_target));
+
+    if (target.get_raw().file_type == Raw::DirectoryFileType::EXT4_FT_DIR) {
+        Raw::Inode raw_dir_inode = dir_inode.get_raw();
+        raw_dir_inode.i_links_count--;
+        this->write_inode(dir_ino, raw_dir_inode);
+    }
+}
+
+void Ext4::Wrappers::Image::dir_rename_entry(const uint32_t dir_ino, const std::string &old_name, const std::string &new_name) {
 }

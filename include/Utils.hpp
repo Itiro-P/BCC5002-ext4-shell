@@ -105,6 +105,17 @@ namespace Utils {
     }
 
     /**
+     * @brief Escreve uma estrutura em um container de bytes.
+     */
+    template <typename T, Container C>
+    inline constexpr void write_to(C &dst, const T &src) {
+        if (dst.size() * sizeof(typename C::value_type) < sizeof(T))
+            throw std::runtime_error("Buffer insuficiente para escrever a estrutura.");
+            
+        std::copy_n(reinterpret_cast<const std::byte*>(&src), sizeof(T), reinterpret_cast<std::byte*>(dst.data()));
+    }
+
+    /**
      * @brief Cria um `std::span<std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
      * @param c O container.
      * @returns Um `std::span<std::byte>` que abrange os dados especificados.
@@ -211,5 +222,17 @@ namespace Utils {
     inline constexpr void set_bit(std::span<std::byte> bitmap_block, const uint32_t idx, const bool val) {       
         if (val) reinterpret_cast<uint8_t*>(bitmap_block.data())[idx/8] |= (1 << idx%8);  // Força o bit a virar 1
         else reinterpret_cast<uint8_t*>(bitmap_block.data())[idx/8] &= ~(1 << idx%8); // Força o bit a virar 0
+    }
+
+    /**
+     * @brief Separa o nome do arquivo com o diretório. Útil caso o usuário passe um diretório junto.
+     * @param str A string alvo.
+     * @returns Um `std::pair<>{diretório, arquivo}`.
+     */
+    inline constexpr std::pair<std::string, std::string> split_path(const std::string &str) {
+        size_t bar = str.find_last_of("/");
+        std::string path = (bar == std::string::npos) ? "" : str.substr(0, bar);
+        std::string filename = (bar == std::string::npos) ? str : str.substr(bar + 1);
+        return {path, filename};
     }
 };

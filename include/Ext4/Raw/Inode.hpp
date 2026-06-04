@@ -32,7 +32,7 @@ namespace Ext4::Raw {
         
         uint32_t  i_generation;     // Versão do ficheiro (utilizado principalmente para exportações NFS)
         uint32_t  i_file_acl_lo;    // 32 bits inferiores do bloco de atributos estendidos (ACL)
-        uint32_t  i_size_high;      // 32 bits superiores do tamanho do ficheiro (anteriormente i_dir_acl)
+        uint32_t  i_size_hi;      // 32 bits superiores do tamanho do ficheiro (anteriormente i_dir_acl)
         uint32_t  i_obso_faddr;     // Endereço de fragmento obsoleto
         
         Flags::Osd2Linux i_osd2;           // Campos específicos adicionais do SO (Mapeado para Linux)

@@ -54,7 +54,7 @@ namespace Ext4::Wrappers {
 
         bool is_file() const { return this->get_type() == Flags::S_IFREG; }
 
-        uint64_t get_size() const { return (static_cast<uint64_t>(this->raw.i_size_high) << 32) | this->raw.i_size_lo; }
+        uint64_t get_size() const { return (static_cast<uint64_t>(this->raw.i_size_hi) << 32) | this->raw.i_size_lo; }
 
         uint16_t get_links_count() const { return this->raw.i_links_count; }
 

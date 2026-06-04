@@ -30,15 +30,6 @@ namespace Ext4::Wrappers {
 
         // O vetor contendo a tabela de descritores de grupos, lida a partir do próximo bloco após o superbloco.
         std::vector<Wrappers::GroupDescriptor> group_descriptors;
-
-        // O vetor contendo os bitmaps dos blocos.
-        std::vector<uint64_t> block_bitmaps;
-
-        // O vetor contendo os bitmaps dos inodes.
-        std::vector<uint64_t> inode_bitmaps;
-
-        // O vetor contendo os offsets dos inodes.
-        std::vector<uint64_t> inode_table_offsets;
         
         /**
          * @brief Método auxiliar para posicionar o ponteiro de leitura/escrita da imagem em um offset específico a partir do início.
@@ -261,6 +252,14 @@ namespace Ext4::Wrappers {
         uint32_t get_block_bit_pos(const uint32_t blk);
 
         /**
+         * @brief Retorna o offset absoluto de um bloco.
+         * @param inode O inode em que o bloco está presente.
+         * @param relative_offset O offset relativo do bloco.
+         * @returns O offset absoluto do bloco.
+         */
+        uint64_t get_absolute_block_offset(const Wrappers::Inode &inode, const uint32_t relative_offset);
+
+        /**
          * @brief Aloca um novo inode.
          * @returns O ID do novo inode.
          */
@@ -283,5 +282,29 @@ namespace Ext4::Wrappers {
          * @param ino O ID do bloco.
          */
         void free_block(const uint32_t blk);
+
+        /**
+         * @brief Relaciona uma um inode a outro.
+         * @param dir_ino O ID do inode que será relacionado (o pai).
+         * @param target_ino O ID do inode que se relacionará. 
+         * @param name O nome do inode (arquivo/diretório).
+         * @param file_type O tipo do inode (arquivo/diretório).
+         */
+        void dir_add_entry(const uint32_t dir_ino, uint32_t target_ino, const std::string &name, const uint8_t file_type);
+
+        /**
+         * @brief Remove uma entrada de nome `name`.
+         * @param dir_ino O ID do inode.
+         * @param name O nome da entrada.
+         */
+        void dir_remove_entry(const uint32_t dir_ino, const std::string &name);
+
+        /**
+         * @brief Renomeia uma entrada de `old_name` para `new_name`.
+         * @param dir_ino O ID do inode.
+         * @param old_name O nome alvo (o antigo).
+         * @param new_name O novo nome.
+         */
+        void dir_rename_entry(const uint32_t dir_ino, const std::string &old_name, const std::string &new_name);
     };
 }
