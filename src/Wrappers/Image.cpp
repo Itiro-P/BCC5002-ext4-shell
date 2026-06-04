@@ -488,12 +488,9 @@ void Ext4::Wrappers::Image::free_block(const uint32_t blk) {
     this->write_gdt(group, new_raw);
 }
 
-void Ext4::Wrappers::Image::dir_add_entry(const uint32_t dir_ino, uint32_t target_ino, const std::string &name, const uint8_t file_type) {
-    if (dir_ino < 1 || target_ino < 1 || name.empty()) return;
-
-    // Pegamos a representação do Inode do Pai
-    Wrappers::Inode dir_inode = this->get_inode(dir_ino);
-    
+void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint32_t target_ino, const std::string &name, const uint8_t file_type) {
+    if (dir_inode.get_inode_id() < 1 || target_ino < 1 || name.empty()) return;
+  
     // Listamos as entradas do PAI
     auto entries = this->list_dir(dir_inode);
     if (entries.empty()) throw std::runtime_error("Diretório pai corrompido ou vazio.");
@@ -539,38 +536,41 @@ void Ext4::Wrappers::Image::dir_add_entry(const uint32_t dir_ino, uint32_t targe
     this->write_offset(new_entry_phys_offset + sizeof(Raw::DirectoryEntry), Utils::as_span(name));
 }
 
-void Ext4::Wrappers::Image::dir_remove_entry(const uint32_t dir_ino, const std::string &name) {
+void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, const std::string &name) {
     if (name == "." || name == "..") {
         std::println("Tentativa de remoção de entrada proibida: {}.", name);
         return;
-    } if (name.empty() || dir_ino < 1) {
+    } if (name.empty() || dir_inode.get_inode_id() < 1) {
         std::println("Entrada vazia/inválida.");
         return;
     }
-
-    Wrappers::Inode dir_inode = this->get_inode(dir_ino);
 
     auto entries = this->list_dir(dir_inode);
 
     if (entries.front().get_name() == name) {
         Raw::DirectoryEntry first_raw = entries.front().get_raw();
+        uint32_t ino_to_free = first_raw.inode;
         first_raw.inode = 0;
         this->write_offset(
             this->get_absolute_block_offset(dir_inode, 0),
             Utils::as_span(first_raw)
         );
-        this->free_inode(first_raw.inode);
+        this->free_inode(ino_to_free);
         for (const auto &blk : this->get_blocks(this->get_inode(first_raw.inode))) {
             this->free_block(blk);
         }
         return;
     }
 
+    auto proccessed_view = entries | std::views::adjacent<2>;
+    auto it = std::ranges::find_if(proccessed_view, [&](const auto &p){ return std::get<1>(p).get_name() == name; });
 
-    auto [before_target, target] = *(entries 
-    | std::views::adjacent<2> 
-    | std::views::filter([&](const auto& p) { return std::get<1>(p).get_name() == name; })
-    ).begin();
+    if (it == proccessed_view.end()) {
+        std::println("Não foi encontrado a entrada.");
+        return;
+    }
+
+    auto [before_target, target] = *it;
 
     uint64_t last_before_entry_logical_offset = std::ranges::fold_left(entries 
     | std::views::take_while([&](const Wrappers::DirectoryEntry &entry) { 
@@ -607,9 +607,32 @@ void Ext4::Wrappers::Image::dir_remove_entry(const uint32_t dir_ino, const std::
     if (target.get_raw().file_type == Raw::DirectoryFileType::EXT4_FT_DIR) {
         Raw::Inode raw_dir_inode = dir_inode.get_raw();
         raw_dir_inode.i_links_count--;
-        this->write_inode(dir_ino, raw_dir_inode);
+        this->write_inode(dir_inode.get_inode_id(), raw_dir_inode);
     }
 }
 
-void Ext4::Wrappers::Image::dir_rename_entry(const uint32_t dir_ino, const std::string &old_name, const std::string &new_name) {
+void Ext4::Wrappers::Image::dir_rename_entry(const Wrappers::Inode &dir_inode, const std::string &old_name, const std::string &new_name) {
+    auto entries = this->list_dir(dir_inode);
+    auto target = std::ranges::find_if(entries, [&](const auto &entry){ return entry.get_name() == old_name; });
+
+    if(target == entries.end()) {
+        std::println("Arquivo não existe/encontrado.");
+        return;
+    }
+
+    auto [new_path, new_filename] = Utils::split_path(new_name);
+
+    uint32_t file_ino  = target->get_inode();
+    uint8_t  file_type = target->get_raw().file_type;
+
+    this->dir_remove_entry(dir_inode, old_name);
+
+    if (new_path.empty()) {
+        // Rename simples — mesmo diretório
+        this->dir_add_entry(dir_inode, file_ino, new_filename, file_type);
+    } else {
+        // Move para outro diretório
+        auto [dest_inode, dest_path] = this->resolve_path(new_path, dir_inode);
+        this->dir_add_entry(dest_inode, file_ino, new_filename, file_type);
+    }
 }

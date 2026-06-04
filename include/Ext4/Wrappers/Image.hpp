@@ -285,26 +285,26 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Relaciona uma um inode a outro.
-         * @param dir_ino O ID do inode que será relacionado (o pai).
+         * @param dir_inode O inode do diretório pai.
          * @param target_ino O ID do inode que se relacionará. 
          * @param name O nome do inode (arquivo/diretório).
          * @param file_type O tipo do inode (arquivo/diretório).
          */
-        void dir_add_entry(const uint32_t dir_ino, uint32_t target_ino, const std::string &name, const uint8_t file_type);
+        void dir_add_entry(const Wrappers::Inode &dir_inode, uint32_t target_ino, const std::string &name, const uint8_t file_type);
 
         /**
          * @brief Remove uma entrada de nome `name`.
-         * @param dir_ino O ID do inode.
+         * @param dir_inode O inode do diretório pai.
          * @param name O nome da entrada.
          */
-        void dir_remove_entry(const uint32_t dir_ino, const std::string &name);
+        void dir_remove_entry(const Wrappers::Inode &dir_inode, const std::string &name);
 
         /**
          * @brief Renomeia uma entrada de `old_name` para `new_name`.
-         * @param dir_ino O ID do inode.
+         * @param dir_inode O inode do diretório pai.
          * @param old_name O nome alvo (o antigo).
          * @param new_name O novo nome.
          */
-        void dir_rename_entry(const uint32_t dir_ino, const std::string &old_name, const std::string &new_name);
+        void dir_rename_entry(const Wrappers::Inode &dir_inode, const std::string &old_name, const std::string &new_name);
     };
 }
