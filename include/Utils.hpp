@@ -30,6 +30,16 @@ namespace Utils {
         return (static_cast<uint64_t>(hi) << bits) | static_cast<uint64_t>(lo);
     }
 
+    /**
+     * @brief Quebra um número pela metade para colocar em campos `lo` e `hi`.
+     */
+    template<typename Lo, typename Hi>
+    void split(uint64_t value, Lo &lo, Hi &hi) {
+        constexpr size_t lo_bits = sizeof(Lo) * 8;
+        lo = static_cast<Lo>(value & ((1ULL << lo_bits) - 1));
+        hi = static_cast<Hi>(value >> lo_bits);
+    }
+
     template <typename T>
     concept Container = requires(T &t) { t.data(); t.size(); };
 

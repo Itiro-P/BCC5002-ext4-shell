@@ -213,15 +213,6 @@ namespace Ext4::Wrappers {
         std::vector<uint64_t> read_blocks_from_index(std::span<const std::byte> node_data, const Raw::ExtentHeader &header);
 
         /**
-         * @brief Cria um diretório e retorna o Inode relacionado a ele.
-         * @param name O (futuro) nome do diretório.
-         * @param parent_inode O ID do inode parente a ele.
-         * @returns Um novo Inode já salvo na imagem.
-         * @throws `std::runtime_error` para quaisquers erros graves na execução.
-         */
-        //Wrappers::Inode make_dir(const std::string &name, const uint32_t parent_inode);
-
-        /**
          * @brief Escreve um inode no disco.
          * @param inode_num O número do inode.
          * @param inode A estrutura `inode`.
@@ -240,5 +231,57 @@ namespace Ext4::Wrappers {
          * @param sp A estrutura SuperBlock.
          */
         void write_superblock(const Raw::SuperBlock &sp);
+
+        /**
+         * @brief Retorna o grupo de blocos que o inode pertence.
+         * @param ino O ID do inode.
+         * @returns O índice do GroupDescriptor para ser usado.
+         */
+        uint32_t get_inode_group(const uint32_t ino);
+
+        /**
+         * @brief Retorna a posição do bit que o inode pertence.
+         * @param ino O ID do inode.
+         * @returns A posição do bit no bitmap do GroupDescriptor relacionado.
+         */
+        uint32_t get_inode_bit_pos(const uint32_t ino);
+
+        /**
+         * @brief Retorna o grupo de blocos que o bloco pertence.
+         * @param ino O ID do bloco.
+         * @returns O índice do GroupDescriptor para ser usado.
+         */
+        uint32_t get_block_group(const uint32_t blk);
+
+        /**
+         * @brief Retorna a posição do bit que o bloco pertence.
+         * @param ino O ID do bloco.
+         * @returns A posição do bit no bitmap do GroupDescriptor relacionado.
+         */
+        uint32_t get_block_bit_pos(const uint32_t blk);
+
+        /**
+         * @brief Aloca um novo inode.
+         * @returns O ID do novo inode.
+         */
+        uint32_t alloc_inode();
+
+        /**
+         * @brief Aloca um novo bloco.
+         * @returns O ID do novo bloco.
+         */
+        uint32_t alloc_block();
+
+        /**
+         * @brief Libera um inode.
+         * @param ino O ID do inode.
+         */
+        void free_inode(const uint32_t ino);
+
+        /**
+         * @brief Libera um bloco.
+         * @param ino O ID do bloco.
+         */
+        void free_block(const uint32_t blk);
     };
 }

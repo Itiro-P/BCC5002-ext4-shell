@@ -116,6 +116,22 @@ void Wrappers::Image::write_block(const uint64_t block_num, const std::span<cons
     this->write_offset(offset, buffer);
 }
 
+uint32_t Ext4::Wrappers::Image::get_inode_group(const uint32_t ino) {
+    return (ino - 1) / this->super_block.get_inodes_per_group();
+}
+
+uint32_t Ext4::Wrappers::Image::get_inode_bit_pos(const uint32_t ino) {
+    return (ino - 1) % this->super_block.get_inodes_per_group();
+}
+
+uint32_t Ext4::Wrappers::Image::get_block_group(const uint32_t blk) {
+    return (blk - this->super_block.get_first_data_block()) / this->super_block.get_blocks_per_group();
+}
+
+uint32_t Ext4::Wrappers::Image::get_block_bit_pos(const uint32_t blk) {
+    return (blk - this->super_block.get_first_data_block()) % this->super_block.get_blocks_per_group();
+}
+
 std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num) {
     // Validação preventiva: Inodes no EXT4 começam obrigatoriamente no índice 1
     if (inode_num == 0 || inode_num > this->super_block.get_inodes_count()) {
@@ -123,10 +139,10 @@ std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num)
     }
 
     // 1. Descobrir a qual Block Group este inode pertence
-    uint32_t group = (inode_num - 1) / this->super_block.get_inodes_per_group();
+    uint32_t group = this->get_inode_group(inode_num);
 
     // 2. Descobrir o índice local do inode dentro da tabela daquele grupo
-    uint32_t index = (inode_num - 1) % this->super_block.get_inodes_per_group();
+    uint32_t index = this->get_inode_bit_pos(inode_num);
 
     // 3. Buscar o offset em bytes de onde começa a tabela de inodes do grupo correspondente
     uint64_t table_base_offset = this->inode_table_offsets[group];
@@ -333,4 +349,134 @@ void Ext4::Wrappers::Image::write_gdt(uint32_t group, const Raw::GroupDescriptor
 void Ext4::Wrappers::Image::write_superblock(const Raw::SuperBlock &sp) {
     this->write_offset(Constants::SUPERBLOCK_OFFSET, Utils::as_span(sp));
     this->super_block = Wrappers::SuperBlock(sp);
+}
+
+uint32_t Ext4::Wrappers::Image::alloc_inode() {
+    bool stop = false;
+    auto &gds = this->group_descriptors;
+
+    size_t gd_id = 0, bit_pos = 0;
+
+    for (size_t i = 0; i < gds.size(); i++) {
+        if (stop) break;
+
+        std::vector<std::byte> inode_bitmap(this->super_block.get_block_size());
+        auto bitmap_span = Utils::as_span(inode_bitmap);
+        this->read_block(gds[i].get_inode_bitmap_block(), bitmap_span);
+
+        for (size_t j = 0; j < inode_bitmap.size() * 8; ++j) {
+            if(!Utils::test_bit(bitmap_span, j)) {
+                Utils::set_bit(bitmap_span, j, 1);
+
+                gd_id = i;
+                bit_pos = j;
+                this->write_block(gds[gd_id].get_inode_bitmap_block(), bitmap_span);
+                stop = true;
+                break;
+            }
+        }
+    }
+
+    if (!stop) throw std::runtime_error("Sem espaço: nenhum inode livre disponível.");
+
+    Wrappers::GroupDescriptor to_change = gds[gd_id];
+
+    Raw::GroupDescriptor new_raw = to_change.get_raw();
+    
+    uint32_t new_inode_count = Utils::concatenate(new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi) - 1;
+    Utils::split(new_inode_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
+
+    to_change.set_raw(new_raw);
+    this->write_gdt(gd_id, new_raw);
+
+    return gd_id * this->super_block.get_inodes_per_group() + bit_pos + 1;
+}
+
+uint32_t Ext4::Wrappers::Image::alloc_block() {
+    bool stop = false;
+    auto &gds = this->group_descriptors;
+
+    uint32_t gd_id = 0, bit_pos = 0;
+
+    for (size_t i = 0; i < gds.size(); i++) {
+        if (stop) break;
+
+        std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
+        auto bitmap_span = Utils::as_span(block_bitmap);
+        this->read_block(gds[i].get_block_bitmap_block(), bitmap_span);
+
+        for (size_t j = 0; j < block_bitmap.size() * 8; ++j) {
+            if(!Utils::test_bit(bitmap_span, j)) {
+                Utils::set_bit(bitmap_span, j, 1);
+
+                gd_id = i;
+                bit_pos = j;
+                this->write_block(gds[gd_id].get_block_bitmap_block(), bitmap_span);
+                stop = true;
+                break;
+            }
+        }
+    }
+
+    if (!stop) throw std::runtime_error("Sem espaço: nenhum bloco livre disponível.");
+
+    Wrappers::GroupDescriptor to_change = gds[gd_id];
+
+    Raw::GroupDescriptor new_raw = to_change.get_raw();
+    
+    uint32_t new_block_count = Utils::concatenate(new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi) - 1;
+    Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
+
+    to_change.set_raw(new_raw);
+    this->write_gdt(gd_id, new_raw);
+
+    return gd_id * this->super_block.get_blocks_per_group() + bit_pos;
+}
+
+void Ext4::Wrappers::Image::free_inode(const uint32_t ino) {
+    uint32_t group = this->get_inode_group(ino);
+    uint32_t bit_pos = this->get_inode_bit_pos(ino);
+
+    auto &gds = this->group_descriptors;
+    std::vector<std::byte> inode_bitmap(this->super_block.get_block_size());
+    auto bitmap_span = Utils::as_span(inode_bitmap);
+    this->read_block(gds[group].get_inode_bitmap_block(), bitmap_span);
+    if(Utils::test_bit(bitmap_span, bit_pos)) {
+        Utils::set_bit(bitmap_span, bit_pos, 0);
+        this->write_block(gds[group].get_inode_bitmap_block(), bitmap_span);
+    } else return;
+
+    Wrappers::GroupDescriptor to_change = gds[group];
+
+    Raw::GroupDescriptor new_raw = to_change.get_raw();
+    
+    uint32_t new_inodes_count = Utils::concatenate(new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi) + 1;
+    Utils::split(new_inodes_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
+
+    to_change.set_raw(new_raw);
+    this->write_gdt(group, new_raw);
+}
+
+void Ext4::Wrappers::Image::free_block(const uint32_t blk) {
+    uint32_t group = this->get_block_group(blk);
+    uint32_t bit_pos = this->get_block_bit_pos(blk);
+
+    auto &gds = this->group_descriptors;
+    std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
+    auto bitmap_span = Utils::as_span(block_bitmap);
+    this->read_block(gds[group].get_block_bitmap_block(), bitmap_span);
+    if(Utils::test_bit(bitmap_span, bit_pos)) {
+        Utils::set_bit(bitmap_span, bit_pos, 0);
+        this->write_block(gds[group].get_block_bitmap_block(), bitmap_span);
+    } else return;
+
+    Wrappers::GroupDescriptor to_change = gds[group];
+
+    Raw::GroupDescriptor new_raw = to_change.get_raw();
+    
+    uint32_t new_blocks_count = Utils::concatenate(new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi) + 1;
+    Utils::split(new_blocks_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
+
+    to_change.set_raw(new_raw);
+    this->write_gdt(group, new_raw);
 }
