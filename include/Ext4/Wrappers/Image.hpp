@@ -292,6 +292,14 @@ namespace Ext4::Wrappers {
          */
         void dir_add_entry(const Wrappers::Inode &dir_inode, uint32_t target_ino, const std::string &name, const uint8_t file_type);
 
+
+        /**
+         * @brief Desvincula uma entrada de diretório dos seus dados
+         * @param dir_inode O Inode.
+         * @param name O nome da entrada.
+         */
+        void dir_unlink_entry(const Wrappers::Inode &dir_inode, const std::string &name);
+
         /**
          * @brief Remove uma entrada de nome `name`.
          * @param dir_inode O inode do diretório pai.

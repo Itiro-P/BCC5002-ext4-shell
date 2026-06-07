@@ -536,78 +536,79 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
     this->write_offset(new_entry_phys_offset + sizeof(Raw::DirectoryEntry), Utils::as_span(name));
 }
 
-void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, const std::string &name) {
-    if (name == "." || name == "..") {
-        std::println("Tentativa de remoção de entrada proibida: {}.", name);
-        return;
-    } if (name.empty() || dir_inode.get_inode_id() < 1) {
-        std::println("Entrada vazia/inválida.");
-        return;
-    }
-
+void Ext4::Wrappers::Image::dir_unlink_entry(const Wrappers::Inode &dir_inode, const std::string &name) {
     auto entries = this->list_dir(dir_inode);
 
+    // Caso especial: primeira entry
     if (entries.front().get_name() == name) {
         Raw::DirectoryEntry first_raw = entries.front().get_raw();
-        uint32_t ino_to_free = first_raw.inode;
         first_raw.inode = 0;
         this->write_offset(
             this->get_absolute_block_offset(dir_inode, 0),
             Utils::as_span(first_raw)
         );
-        this->free_inode(ino_to_free);
-        for (const auto &blk : this->get_blocks(this->get_inode(first_raw.inode))) {
-            this->free_block(blk);
-        }
         return;
     }
 
-    auto proccessed_view = entries | std::views::adjacent<2>;
-    auto it = std::ranges::find_if(proccessed_view, [&](const auto &p){ return std::get<1>(p).get_name() == name; });
-
-    if (it == proccessed_view.end()) {
-        std::println("Não foi encontrado a entrada.");
-        return;
-    }
+    // Caso geral: expande rec_len da entry anterior
+    auto processed_view = entries | std::views::adjacent<2>;
+    auto it = std::ranges::find_if(processed_view, [&](const auto &p){
+        return std::get<1>(p).get_name() == name;
+    });
+    if (it == processed_view.end()) return;
 
     auto [before_target, target] = *it;
 
-    uint64_t last_before_entry_logical_offset = std::ranges::fold_left(entries 
-    | std::views::take_while([&](const Wrappers::DirectoryEntry &entry) { 
-        return entry.get_name() != before_target.get_name(); // Para ANTES do before_target
-    })
-    | std::views::transform([&](const Wrappers::DirectoryEntry &entry){ return entry.get_raw().rec_len; }),
-    0, std::plus<uint64_t>{});
+    uint64_t before_logical = std::ranges::fold_left(
+        entries
+        | std::views::take_while([&](const Wrappers::DirectoryEntry &e){
+            return e.get_name() != before_target.get_name();
+          })
+        | std::views::transform([](const Wrappers::DirectoryEntry &e){
+            return static_cast<uint64_t>(e.get_raw().rec_len);
+          }),
+        0ULL, std::plus<uint64_t>{}
+    );
 
-    uint64_t last_before_entry_absolute_offset = this->get_absolute_block_offset(dir_inode, last_before_entry_logical_offset);
+    uint64_t before_phys = this->get_absolute_block_offset(dir_inode, before_logical);
 
-    Raw::DirectoryEntry new_before_target = before_target.get_raw();
-    new_before_target.rec_len += target.get_raw().rec_len;
+    Raw::DirectoryEntry new_before = before_target.get_raw();
+    new_before.rec_len += target.get_raw().rec_len;
+    this->write_offset(before_phys, Utils::as_span(new_before));
+}
 
-    auto target_inode_wrapper = this->get_inode(target.get_inode());
-    Raw::Inode raw_target_inode = target_inode_wrapper.get_raw();
+void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, const std::string &name) {
+    if (name == "." || name == ".." || name.empty()) return;
 
-    // Decrementa o link do próprio arquivo que está sendo removido
-    raw_target_inode.i_links_count--; 
+    auto entries = this->list_dir(dir_inode);
+    auto target = std::ranges::find_if(entries, [&](const auto &e){
+        return e.get_name() == name;
+    });
+    if (target == entries.end()) return;
 
-    if (raw_target_inode.i_links_count == 0) {
-        // Se ninguém mais aponta para ele, limpa do mapa!
-        this->free_inode(target.get_inode());
-        for (const auto &blk : this->get_blocks(target_inode_wrapper)) {
+    uint32_t ino      = target->get_inode();
+    uint8_t file_type = target->get_raw().file_type;
+
+    // Remove só a DirEntry
+    this->dir_unlink_entry(dir_inode, name);
+
+    // Lida com inode
+    Raw::Inode raw = this->get_raw_inode(ino);
+    raw.i_links_count--;
+
+    if (raw.i_links_count == 0) {
+        this->free_inode(ino);
+        for (const auto &blk : this->get_blocks(this->get_inode(ino)))
             this->free_block(blk);
-        }
     } else {
-        // Se ainda há outros hard links, apenas atualiza o inode dele com o link decrementado
-        this->write_inode(target.get_inode(), raw_target_inode);
+        this->write_inode(ino, raw);
     }
 
-    // Grava o cabeçalho da "nova" entrada no disco
-    this->write_offset(last_before_entry_absolute_offset, Utils::as_span(new_before_target));
-
-    if (target.get_raw().file_type == Raw::DirectoryFileType::EXT4_FT_DIR) {
-        Raw::Inode raw_dir_inode = dir_inode.get_raw();
-        raw_dir_inode.i_links_count--;
-        this->write_inode(dir_inode.get_inode_id(), raw_dir_inode);
+    // Se era diretório, decrementa link do pai
+    if (file_type == Raw::DirectoryFileType::EXT4_FT_DIR) {
+        Raw::Inode raw_dir = dir_inode.get_raw();
+        raw_dir.i_links_count--;
+        this->write_inode(dir_inode.get_inode_id(), raw_dir);
     }
 }
 
@@ -625,7 +626,7 @@ void Ext4::Wrappers::Image::dir_rename_entry(const Wrappers::Inode &dir_inode, c
     uint32_t file_ino  = target->get_inode();
     uint8_t  file_type = target->get_raw().file_type;
 
-    this->dir_remove_entry(dir_inode, old_name);
+    this->dir_unlink_entry(dir_inode, old_name);
 
     if (new_path.empty()) {
         // Rename simples — mesmo diretório
