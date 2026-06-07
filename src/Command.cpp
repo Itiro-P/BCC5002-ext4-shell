@@ -2,6 +2,7 @@
 #include <iostream>
 #include <charconv>
 #include <ranges>
+#include <algorithm>
 
 using Ext4::Wrappers::Image;
 
@@ -29,19 +30,18 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     auto entries = img.list_dir(parent_dir);
 
-    // Cria a view filtrada
-    auto target_file = entries | std::views::filter([&](const auto& entry) {
+    // Cria a view filtrada para ver se há um arquivo aqui.
+    auto target_file = std::ranges::find_if(entries, [&](const auto& entry) {
         return entry.get_name() == filename;
     });
 
     // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
-    if (std::ranges::empty(target_file)) {
+    if (target_file == entries.end()) {
         std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", filename);
         return 1;
     }
 
-    Wrappers::DirectoryEntry file = *target_file.begin();
-    Wrappers::Inode file_inode = img.get_inode(file.get_inode());
+    Wrappers::Inode file_inode = img.get_inode(target_file->get_inode());
     
     std::vector<std::byte> bytes = img.read_file(file_inode);
 
@@ -82,8 +82,8 @@ short Command::cd(Image &img, const std::vector<std::string> &args) {
 short Command::ls(Image &img, const std::vector<std::string> &args) {
     const std::string target_path = args.size() > 1 ? args[1] : img.get_current_path();
     auto [parent_dir, path] = img.resolve_path(target_path, img.get_current_inode());
-    auto entries = img.list_dir(parent_dir);
-    for(const auto &entry: entries) {
+
+    for(const auto &entry: img.list_dir(parent_dir)) {
         std::println("{}{}{}", entry.is_dir() ? "\033[32m" : "", entry.get_name(), entry.is_dir() ? "\033[0m" : "");
     }
     return 0;
@@ -171,6 +171,17 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
 
+    // Vemos se o arquivo já existe.
+    auto file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
+        return entry.get_name() == filename;
+    });
+
+    // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
+    if (file_exists) {
+        std::println(std::cerr, "Erro: Arquivo '{}' já existe.", filename);
+        return 1;
+    }
+
     uint32_t new_inode_id = img.alloc_inode();
     uint32_t now = static_cast<uint32_t>(std::time(nullptr));
 
@@ -230,18 +241,16 @@ short Command::rm(Image &img, const std::vector<std::string> &args) {
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     
-    // Cria a view filtrada
-    auto target_file = img.list_dir(parent_dir) | std::views::filter([&](const auto& entry) {
+    // Vemos se o arquivo existe.
+    auto file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
         return entry.get_name() == filename;
     });
 
     // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
-    if (std::ranges::empty(target_file)) {
+    if (!file_exists) {
         std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", filename);
         return 1;
     }
-
-    Wrappers::DirectoryEntry file = *target_file.begin();
 
     img.dir_remove_entry(parent_dir, filename);
 
@@ -274,18 +283,16 @@ short Command::rename(Image &img, const std::vector<std::string> &args) {
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     
-    // Cria a view filtrada
-    auto target_file = img.list_dir(parent_dir) | std::views::filter([&](const auto& entry) {
+    // Vemos se o arquivo existe.
+    auto file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
         return entry.get_name() == filename;
     });
 
     // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
-    if (std::ranges::empty(target_file)) {
+    if (!file_exists) {
         std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", filename);
         return 1;
     }
-
-    Wrappers::DirectoryEntry entry = *target_file.begin();
 
     img.dir_rename_entry(parent_dir, filename, new_file_name);
 

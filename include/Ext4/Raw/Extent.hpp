@@ -34,7 +34,7 @@ namespace Ext4::Raw {
          * @brief Concatena os bits inferiores e superiores para extrair o endereço físico real.
          * @returns uint64_t Endereço absoluto de 48 bits do bloco físico filho em disco.
          */
-        uint64_t getLeafBlock() const noexcept { 
+        uint64_t get_leaf_block() const noexcept { 
             return (static_cast<uint64_t>(ei_leaf_hi) << 32) | ei_leaf_lo; 
         }
     };
@@ -61,7 +61,7 @@ namespace Ext4::Raw {
          * @brief Trata a flag de inicialização para retornar a quantidade real de blocos do extent.
          * @returns uint16_t Quantidade limpa de blocos alocados no intervalo.
          */
-        uint16_t getRealLength() const noexcept { 
+        uint16_t get_real_length() const noexcept { 
             return isUninitialized() ? (ee_len - 32768) : ee_len; 
         }
 
@@ -69,7 +69,7 @@ namespace Ext4::Raw {
          * @brief Concatena os bits inferiores e superiores para obter o início do bloco físico de dados.
          * @returns uint64_t Endereço de início absoluto de 48 bits do bloco de dados físico em disco.
          */
-        uint64_t getStartBlock() const noexcept { 
+        uint64_t get_start_block() const noexcept { 
             return (static_cast<uint64_t>(ee_start_hi) << 32) | ee_start_lo; 
         }
     };

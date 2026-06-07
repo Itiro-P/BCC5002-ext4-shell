@@ -124,7 +124,7 @@ namespace Ext4::Wrappers {
          * @param str o caminho.
          */
         void set_current_path(const std::string &str) {
-            this->current_path= str;
+            if(!str.empty()) this->current_path = str;
         }
 
         /**
@@ -282,6 +282,11 @@ namespace Ext4::Wrappers {
          * @param ino O ID do bloco.
          */
         void free_block(const uint32_t blk);
+
+        /**
+         * @brief Retorna o offset lógico de uma entrada.
+         */
+        uint64_t entry_logical_offset(std::span<const Wrappers::DirectoryEntry> entries, size_t idx) const;
 
         /**
          * @brief Relaciona uma um inode a outro.

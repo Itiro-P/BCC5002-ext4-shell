@@ -120,7 +120,7 @@ namespace Utils {
      * @param c O container.
      * @returns Um `std::span<std::byte>` que abrange os dados especificados.
      */
-    inline constexpr auto as_span(Container auto &c) {
+    inline constexpr auto as_byte_span(Container auto &c) {
         using ContainerType = std::remove_cvref_t<decltype(c)>;
         return std::span(reinterpret_cast<std::byte*>(c.data()), c.size() * sizeof(typename ContainerType::value_type));
     }
@@ -130,9 +130,29 @@ namespace Utils {
      * @param c Ocontainer.
      * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
      */
-    inline constexpr auto as_span(const Container auto &c) {
+    inline constexpr auto as_byte_span(const Container auto &c) {
         using ContainerType = std::remove_cvref_t<decltype(c)>;
         return std::span(reinterpret_cast<const std::byte*>(c.data()), c.size() * sizeof(typename ContainerType::value_type));
+    }
+
+    /**
+     * @brief Cria um `std::span<T>` a partir de um container const,
+     * preservando o tipo do elemento sem conversão para bytes.
+     */
+    template <Container C>
+    inline constexpr auto as_span(C &c) {
+        using ValueType = typename std::remove_cvref_t<C>::value_type;
+        return std::span<ValueType>(c.data(), c.size());
+    }
+
+    /**
+     * @brief Cria um `std::span<const T>` a partir de um container const,
+     * preservando o tipo do elemento sem conversão para bytes.
+     */
+    template <Container C>
+    inline constexpr auto as_span(const C &c) {
+        using ValueType = typename std::remove_cvref_t<C>::value_type;
+        return std::span<const ValueType>(c.data(), c.size());
     }
 
     /**
@@ -140,7 +160,7 @@ namespace Utils {
      * @param c O objeto.
      * @returns Um `std::span<std::byte>` que abrange os dados especificados.
      */
-    inline constexpr auto as_span(Object auto &o) {
+    inline constexpr auto as_byte_span(Object auto &o) {
         return std::span(reinterpret_cast<std::byte*>(&o), sizeof(o));
     }
 
@@ -149,7 +169,7 @@ namespace Utils {
      * @param c O objeto.
      * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
      */
-    inline constexpr auto as_span(const Object auto &o) {
+    inline constexpr auto as_byte_span(const Object auto &o) {
         return std::span(reinterpret_cast<const std::byte*>(&o), sizeof(o));
     }
 
