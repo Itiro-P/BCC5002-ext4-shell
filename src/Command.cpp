@@ -28,7 +28,7 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
     auto [path, filename] = Utils::split_path(file_path);
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
-    auto entries = img.list_dir(parent_dir);
+    std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
     // Cria a view filtrada para ver se há um arquivo aqui.
     auto target_file = std::ranges::find_if(entries, [&](const auto& entry) {
@@ -172,7 +172,7 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
 
     // Vemos se o arquivo já existe.
-    auto file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
+    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
         return entry.get_name() == filename;
     });
 
@@ -242,7 +242,7 @@ short Command::rm(Image &img, const std::vector<std::string> &args) {
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     
     // Vemos se o arquivo existe.
-    auto file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
+    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
         return entry.get_name() == filename;
     });
 
@@ -284,7 +284,7 @@ short Command::rename(Image &img, const std::vector<std::string> &args) {
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     
     // Vemos se o arquivo existe.
-    auto file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
+    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
         return entry.get_name() == filename;
     });
 

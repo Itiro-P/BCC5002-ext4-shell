@@ -156,6 +156,19 @@ namespace Utils {
     }
 
     /**
+     * @brief Interpreta bytes de um span a partir de um offset como um span de T.
+     * Útil para percorrer estruturas sequenciais em buffers binários.
+     */
+    template <typename T, std::integral Count>
+    inline std::span<const T> as_span_offset(std::span<const std::byte> src, size_t offset, Count count) {
+        return std::span<const T>(
+            reinterpret_cast<const T*>(src.data() + offset),
+            static_cast<size_t>(count)
+        );
+    }
+
+
+    /**
      * @brief Cria um `std::span<std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
      * @param c O objeto.
      * @returns Um `std::span<std::byte>` que abrange os dados especificados.

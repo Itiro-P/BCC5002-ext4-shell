@@ -166,10 +166,8 @@ Wrappers::Inode Wrappers::Image::get_inode(const uint32_t inode_num) {
 
 std::vector<uint64_t> Wrappers::Image::read_blocks_from_leafs(std::span<const std::byte> node_data, const Raw::ExtentHeader &header) {
     std::vector<uint64_t> blocks;
-    auto leafs = std::span<const Raw::ExtentLeaf>(
-        reinterpret_cast<const Raw::ExtentLeaf*>(node_data.data() + sizeof(Raw::ExtentHeader)), 
-        header.eh_entries
-    );
+    std::span<const Raw::ExtentLeaf> leafs = Utils::as_span_offset<Raw::ExtentLeaf>(node_data, sizeof(Raw::ExtentHeader), header.eh_entries);
+
     for (const auto &leaf : leafs) {
         uint64_t start_block = leaf.get_start_block();
         uint16_t length = leaf.get_real_length();
@@ -181,16 +179,13 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_leafs(std::span<const st
 }
 
 std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(std::span<const std::byte> node_data, const Raw::ExtentHeader &header) {
-    std::vector<uint64_t> blocks;
+    std::vector<uint64_t> blocks{};
     
     if (header.eh_magic != Constants::EXTENT_MAGIC) {
         throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico de extents inválido.");
     }
-    
-    auto index_entries = std::span<const Raw::ExtentIndex>(
-        reinterpret_cast<const Raw::ExtentIndex*>(node_data.data() + sizeof(Raw::ExtentHeader)), 
-        header.eh_entries
-    );
+
+    std::span<const Raw::ExtentIndex> index_entries = Utils::as_span_offset<Raw::ExtentIndex>(node_data, sizeof(Raw::DirectoryEntry), header.eh_entries);
 
     std::vector<std::byte> buffer(this->super_block.get_block_size());
 
@@ -234,7 +229,7 @@ std::vector<std::byte> Wrappers::Image::read_file(const Wrappers::Inode &inode) 
 
 std::vector<uint64_t> Wrappers::Image::get_blocks(const Wrappers::Inode &inode) {
     std::vector<uint64_t> data_blocks;
-    auto header = Utils::copy<Raw::ExtentHeader>(inode.get_i_block());
+    Raw::ExtentHeader header = Utils::copy<Raw::ExtentHeader>(inode.get_i_block());
 
     if (header.eh_magic != Constants::EXTENT_MAGIC)
         throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico de extents inválido. O Inode pode estar corrompido ou não utilizar extents.");
@@ -498,7 +493,7 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
     if (dir_inode.get_inode_id() < 1 || target_ino < 1 || name.empty()) return;
   
     // Listamos as entradas do PAI
-    auto entries = this->list_dir(dir_inode);
+    std::vector<Wrappers::DirectoryEntry> entries = this->list_dir(dir_inode);
     if (entries.empty()) throw std::runtime_error("Diretório pai corrompido ou vazio.");
 
 
@@ -540,7 +535,7 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
 }
 
 void Ext4::Wrappers::Image::dir_unlink_entry(const Wrappers::Inode &dir_inode, const std::string &name) {
-    auto entries = this->list_dir(dir_inode);
+    std::vector<Wrappers::DirectoryEntry> entries = this->list_dir(dir_inode);
 
     // Caso especial: primeira entry
     if (entries.front().get_name() == name) {
@@ -581,7 +576,7 @@ void Ext4::Wrappers::Image::dir_unlink_entry(const Wrappers::Inode &dir_inode, c
 void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, const std::string &name) {
     if (name == "." || name == ".." || name.empty()) return;
 
-    auto entries = this->list_dir(dir_inode);
+    std::vector<Wrappers::DirectoryEntry> entries = this->list_dir(dir_inode);
     auto target = std::ranges::find_if(entries, [&](const auto &e){
         return e.get_name() == name;
     });
@@ -615,7 +610,7 @@ void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, c
 }
 
 void Ext4::Wrappers::Image::dir_rename_entry(const Wrappers::Inode &dir_inode, const std::string &old_name, const std::string &new_name) {
-    auto entries = this->list_dir(dir_inode);
+    std::vector<Wrappers::DirectoryEntry> entries = this->list_dir(dir_inode);
     auto target = std::ranges::find_if(entries, [&](const auto &entry){ return entry.get_name() == old_name; });
 
     if(target == entries.end()) {
