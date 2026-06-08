@@ -618,7 +618,7 @@ void Ext4::Wrappers::Image::dir_rename_entry(const Wrappers::Inode &dir_inode, c
         return;
     }
 
-    auto [new_path, new_filename] = Utils::split_path(new_name);
+    auto [new_path, new_file_name] = Utils::split_path(new_name);
 
     uint32_t file_ino  = target->get_inode();
     uint8_t  file_type = target->get_raw().file_type;
@@ -627,10 +627,10 @@ void Ext4::Wrappers::Image::dir_rename_entry(const Wrappers::Inode &dir_inode, c
 
     if (new_path.empty()) {
         // Rename simples — mesmo diretório
-        this->dir_add_entry(dir_inode, file_ino, new_filename, file_type);
+        this->dir_add_entry(dir_inode, file_ino, new_file_name, file_type);
     } else {
         // Move para outro diretório
         auto [dest_inode, dest_path] = this->resolve_path(new_path, dir_inode);
-        this->dir_add_entry(dest_inode, file_ino, new_filename, file_type);
+        this->dir_add_entry(dest_inode, file_ino, new_file_name, file_type);
     }
 }

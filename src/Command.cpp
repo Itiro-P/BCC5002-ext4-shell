@@ -25,19 +25,19 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    auto [path, filename] = Utils::split_path(file_path);
+    auto [path, file_name] = Utils::split_path(file_path);
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
     // Cria a view filtrada para ver se há um arquivo aqui.
-    auto target_file = std::ranges::find_if(entries, [&](const auto& entry) {
-        return entry.get_name() == filename;
+    auto target_file = std::ranges::find_if(entries, [&](const auto &entry) {
+        return entry.get_name() == file_name;
     });
 
     // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
     if (target_file == entries.end()) {
-        std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", filename);
+        std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", file_name);
         return 1;
     }
 
@@ -167,18 +167,18 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    auto [path, filename] = Utils::split_path(file_path);
+    auto [path, file_name] = Utils::split_path(file_path);
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
 
     // Vemos se o arquivo já existe.
-    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
-        return entry.get_name() == filename;
+    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto &entry) {
+        return entry.get_name() == file_name;
     });
 
     // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
     if (file_exists) {
-        std::println(std::cerr, "Erro: Arquivo '{}' já existe.", filename);
+        std::println(std::cerr, "Erro: Arquivo '{}' já existe.", file_name);
         return 1;
     }
 
@@ -212,7 +212,7 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
 
     img.write_inode(new_inode_id, new_inode);
 
-    img.dir_add_entry(parent_dir, new_inode_id, filename, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
+    img.dir_add_entry(parent_dir, new_inode_id, file_name, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
     return 0;
 }
 
@@ -237,22 +237,22 @@ short Command::rm(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    auto [path, filename] = Utils::split_path(file_path);
+    auto [path, file_name] = Utils::split_path(file_path);
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     
     // Vemos se o arquivo existe.
-    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
-        return entry.get_name() == filename;
+    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const Wrappers::DirectoryEntry &entry) {
+        return entry.get_name() == file_name;
     });
 
     // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
     if (!file_exists) {
-        std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", filename);
+        std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", file_name);
         return 1;
     }
 
-    img.dir_remove_entry(parent_dir, filename);
+    img.dir_remove_entry(parent_dir, file_name);
 
     return 0;
 }
@@ -279,22 +279,22 @@ short Command::rename(Image &img, const std::vector<std::string> &args) {
         return 1;
     }
 
-    auto [path, filename] = Utils::split_path(file);
+    auto [path, file_name] = Utils::split_path(file);
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     
     // Vemos se o arquivo existe.
-    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto& entry) {
-        return entry.get_name() == filename;
+    bool file_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const auto &entry) {
+        return entry.get_name() == file_name;
     });
 
     // Verifica se o arquivo realmente foi encontrado antes de extrair para a variável
     if (!file_exists) {
-        std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", filename);
+        std::println(std::cerr, "Erro: Arquivo '{}' não encontrado.", file_name);
         return 1;
     }
 
-    img.dir_rename_entry(parent_dir, filename, new_file_name);
+    img.dir_rename_entry(parent_dir, file_name, new_file_name);
 
     return 0;
 }

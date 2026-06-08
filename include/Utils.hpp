@@ -265,7 +265,7 @@ namespace Utils {
     inline constexpr std::pair<std::string, std::string> split_path(const std::string &str) {
         size_t bar = str.find_last_of("/");
         std::string path = (bar == std::string::npos) ? "" : str.substr(0, bar);
-        std::string filename = (bar == std::string::npos) ? str : str.substr(bar + 1);
-        return {path, filename};
+        std::string file_name = (bar == std::string::npos) ? str : str.substr(bar + 1);
+        return {path, file_name};
     }
 };
