@@ -10,7 +10,12 @@ Ext4::Wrappers::SuperBlock::SuperBlock(const Raw::SuperBlock &raw_super_block) :
     this->_is_64 = (raw.s_feature_incompat  &Flags::SuperBlockFlags::IncompatFeature::INCOMPAT_64BIT) != 0;
 }
 
-void Ext4::Wrappers::SuperBlock::validate() const {
+Ext4::Raw::SuperBlock Ext4::Wrappers::SuperBlock::get_raw() const {
+    return this->raw;
+}
+
+void Ext4::Wrappers::SuperBlock::validate() const
+{
     if (this->raw.s_magic != Ext4::Constants::EXT_MAGIC) {
         throw std::runtime_error("Erro: SuperBlock inválido - Assinatura mágica incorreta. O sistema de arquivos pode estar corrompido ou não ser um EXT4.");
     }

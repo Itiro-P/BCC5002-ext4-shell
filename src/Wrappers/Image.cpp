@@ -185,7 +185,7 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(std::span<const st
         throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico de extents inválido.");
     }
 
-    std::span<const Raw::ExtentIndex> index_entries = Utils::as_span_offset<Raw::ExtentIndex>(node_data, sizeof(Raw::DirectoryEntry), header.eh_entries);
+    std::span<const Raw::ExtentIndex> index_entries = Utils::as_span_offset<Raw::ExtentIndex>(node_data, sizeof(Raw::ExtentHeader), header.eh_entries);
 
     std::vector<std::byte> buffer(this->super_block.get_block_size());
 
@@ -387,6 +387,10 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
     to_change.set_raw(new_raw);
     this->write_gdt(gd_id, new_raw);
 
+    Raw::SuperBlock sb_raw = this->super_block.get_raw();
+    sb_raw.s_free_inodes_count--;
+    this->write_superblock(sb_raw);
+
     return gd_id * this->super_block.get_inodes_per_group() + bit_pos + 1;
 }
 
@@ -428,6 +432,12 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
     to_change.set_raw(new_raw);
     this->write_gdt(gd_id, new_raw);
 
+    Raw::SuperBlock sb_raw = this->super_block.get_raw();
+    uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
+    global_free_blocks--;
+    Utils::split(global_free_blocks, sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
+    this->write_superblock(sb_raw);
+
     return gd_id * this->super_block.get_blocks_per_group() + bit_pos;
 }
 
@@ -453,6 +463,10 @@ void Ext4::Wrappers::Image::free_inode(const uint32_t ino) {
 
     to_change.set_raw(new_raw);
     this->write_gdt(group, new_raw);
+
+    Raw::SuperBlock sb_raw = this->super_block.get_raw();
+    sb_raw.s_free_inodes_count++;
+    this->write_superblock(sb_raw);
 }
 
 void Ext4::Wrappers::Image::free_block(const uint32_t blk) {
@@ -477,6 +491,12 @@ void Ext4::Wrappers::Image::free_block(const uint32_t blk) {
 
     to_change.set_raw(new_raw);
     this->write_gdt(group, new_raw);
+
+    Raw::SuperBlock sb_raw = this->super_block.get_raw();
+    uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
+    global_free_blocks++;
+    Utils::split(global_free_blocks, sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
+    this->write_superblock(sb_raw);
 }
 
 uint64_t Ext4::Wrappers::Image::entry_logical_offset(std::span<const Wrappers::DirectoryEntry> entries, size_t idx) const {
@@ -519,11 +539,10 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
     Raw::DirectoryEntry new_raw{
         .inode = target_ino,
         // Ela herda o resto do espaço alocado antigo que sobrou do bloco
-        .rec_len = static_cast<uint16_t>(old_total_rec_len - last_raw.rec_len),
+        .rec_len = Utils::to_4bit_aligned(old_total_rec_len - last_raw.rec_len),
         .name_len = static_cast<uint8_t>(name.size()),
         .file_type = file_type
     };
-
     // O offset físico da nova entrada será logo após o término do rec_len da que acabamos de atualizar
     uint64_t new_entry_phys_offset = last_entry_phys_offset + last_raw.rec_len;
 

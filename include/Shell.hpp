@@ -21,6 +21,9 @@ class Shell {
     // Imagem que será carregada e manipulada pelos comandos do shell.
     Image image;
 
+    static inline constexpr std::string fail_prefix = "\033[31mx\033[0m";
+    static inline constexpr std::string success_prefix = "\033[32m+\033[0m";
+
     // Comandos para saida do shell.
     static inline std::unordered_set<std::string> exit_commands{"exit", "quit", "\\q"};
 
@@ -45,10 +48,16 @@ class Shell {
         {"clear",  [](Image &img, const CommandArgs &args) { return Command::clear(); }}
     };
 
-    /** * @brief Imprime o prompt do shell com base no tipo do inode atual.
+    /** 
+     * @brief Imprime o prompt do shell com base no tipo do inode atual.
+     * @param exit_code O código de saída do comando anterior.
      */
-    void print_prompt() {
-        std::print("({})> ", this->image.get_current_path());
+    void print_prompt(const uint8_t exit_code) {
+        if(exit_code == 0) {
+            std::print("{} - ({})> ", success_prefix, this->image.get_current_path());
+        } else {
+            std::print("{} - ({})> ", fail_prefix, this->image.get_current_path());
+        }
     }
 
 public:

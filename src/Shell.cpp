@@ -8,7 +8,7 @@ short Shell::run() {
     short exit_code = 0;
 
     while (true) {
-        print_prompt();
+        this->print_prompt(exit_code);
 
         if (!std::getline(std::cin, line)) break;  // EOF (Ctrl+D)
 

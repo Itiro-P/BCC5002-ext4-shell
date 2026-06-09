@@ -160,13 +160,23 @@ namespace Utils {
      * Útil para percorrer estruturas sequenciais em buffers binários.
      */
     template <typename T, std::integral Count>
-    inline std::span<const T> as_span_offset(std::span<const std::byte> src, size_t offset, Count count) {
+    inline constexpr std::span<const T> as_span_offset(std::span<const std::byte> src, size_t offset, Count count) {
         return std::span<const T>(
             reinterpret_cast<const T*>(src.data() + offset),
             static_cast<size_t>(count)
         );
     }
 
+    /**
+     * @brief "Desloca" um número para seu múltiplo de 4 mais próximo.
+     * Truquezinho: Múltiplos de 4 sempre terminam com 00 à direita.
+     * - Somar 3 a um número faz com que ele entre na "próxima" casa de um múltiplo de 4.
+     * - Mascarar com o complemento de 1 do 3 resulta na limpeza dos primeiros 2 bits à direita.
+     */
+    template <std::integral T>
+    inline constexpr T to_4bit_aligned(const T &to_align) {
+        return (to_align + 3) & ~3;
+    }
 
     /**
      * @brief Cria um `std::span<std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.

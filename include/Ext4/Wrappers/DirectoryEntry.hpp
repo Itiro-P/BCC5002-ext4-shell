@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../Ext4/Raw/Directory.hpp"
+#include "../../Utils.hpp"
 #include <string>
 
 namespace Ext4::Wrappers {
@@ -67,7 +68,7 @@ namespace Ext4::Wrappers {
             // Truquezinho: Múltiplos de 4 sempre terminam com 00 à direita.
             // Somar 3 a um número faz com que ele entre na "próxima" casa de um múltiplo de 4.
             // Mascarar com o complemento de 1 do 3 resulta na limpeza dos primeiros 2 bits à direita.
-            return (bytes_needed + 3) & ~3;
+            return Utils::to_4bit_aligned(bytes_needed);
         }
 
         /**

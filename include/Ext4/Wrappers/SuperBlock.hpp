@@ -17,6 +17,11 @@ public:
     SuperBlock(const Raw::SuperBlock &raw_super_block);
 
     /**
+     * @brief Retorna a estrutura vinculada ao Wrappers
+     */
+    Raw::SuperBlock get_raw() const;
+
+    /**
      * @brief Valida a assinatura mágica e campos críticos do SuperBlock.
      * @throws `std::runtime_error` se a assinatura mágica for diferente de `0xEF53`.
      */
@@ -53,8 +58,7 @@ public:
     bool has_huge_file() const;
 
     /**
-     * @brief Indica se checksums de metadados estão ativos (s_feature_ro_compat).
-     * O projeto não valida checksums, mas é útil saber para não reportar falsos erros.
+     * @brief Indica se checksums de metadados estão ativos (`s_feature_ro_compat`).
      */
     bool has_metadata_csum() const;
 

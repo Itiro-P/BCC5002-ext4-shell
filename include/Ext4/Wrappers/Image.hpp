@@ -149,7 +149,6 @@ namespace Ext4::Wrappers {
          * @param path O diretório alvo.
          * @param base o Inode base a ser o alvo inicial de procura.
          * @returns O Inode relacionado ao diretório alvo.
-         * @throws `std::runtime_error` para quaisquers erros que ocorram na execução.
          */
         std::pair<Wrappers::Inode, std::string> resolve_path(const std::string &path, const Wrappers::Inode &base);
 
