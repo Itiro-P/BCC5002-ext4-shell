@@ -13,6 +13,15 @@ Este é o código para o projeto final da disciplina de Sistemas Operacionais (5
 - Ambiente Linux (testado em distribuições modernas).
 - `g++` com suporte a C++23 (ex.: GCC 11+).
 - ferramentas básicas: `make`, `rm`.
+- Biblioteca Crypto++.
+	- Em distros baseadas em *Debian*:
+	```bash
+	# apt install libcrypto++-dev
+	```
+	- Em distros baseadas em *Arch Linux*:
+	```bash
+	# pacman -S crypto++
+	```
 
 **Como compilar**
 
@@ -23,7 +32,7 @@ Opções recomendadas:
 	- Compilação release (otimizada):
 
 		```bash
-		make
+		$ make
 		```
 
 		Isso gera o binário `ext4shell`.
@@ -31,25 +40,25 @@ Opções recomendadas:
 	- Compilação para depuração (AddressSanitizer, símbolos de depuração):
 
 		```bash
-		make debug
+		$ make debug
 		```
 
 	- Limpar artefatos de build:
 
 		```bash
-		make clean
+		$ make clean
 		```
 
 - Compilar diretamente com `g++` (sem `make`):
 
 	```bash
-	g++ main.cpp -o ext4shell -std=c++23 -Wall -Wextra -pedantic -O2
+	$ g++ main.cpp -o ext4shell -std=c++23 -Wall -Wextra -pedantic -O2 -lcryptopp
 	```
 
 	Para build de debug equivalente ao `make debug`:
 
 	```bash
-	g++ main.cpp -o ext4shell -std=c++23 -Wall -Wextra -pedantic -g -O0 -DDEBUG -fsanitize=address,undefined
+	$ g++ main.cpp -o ext4shell -std=c++23 -Wall -Wextra -pedantic -g -O0 -DDEBUG -fsanitize=address,undefined -lcryptopp
 	```
 
 **Como executar**
@@ -57,7 +66,7 @@ Opções recomendadas:
 Após compilar, execute:
 
 ```bash
-./ext4shell
+$ ./ext4shell
 ```
 
 **Notas**

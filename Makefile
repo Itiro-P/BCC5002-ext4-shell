@@ -1,5 +1,5 @@
 CXX      := g++
-CXXFLAGS := -std=c++23 -Wall -Wextra -pedantic -O2
+CXXFLAGS := -std=c++23 -Wall -Wextra -pedantic -O2 -lcryptopp
 DBGFLAGS := -std=c++23 -Wall -Wextra -pedantic -g -O0 -DDEBUG -fsanitize=address,undefined
 
 TARGET   := ext4shell
