@@ -1,14 +1,12 @@
 #include "../include/Ext4/Checksum.hpp"
-#include <bit>
 
 using namespace CryptoPP;
 
 CRC32C crc;
-
-std::array<std::byte, 4> digest{};
+std::span<std::byte, 4> digest;
 
 uint32_t bytearray_to_int32_le(std::span<const std::byte, 4> b) {
-    return std::bit_cast<uint32_t>(digest);
+    return static_cast<uint32_t>((b[3] << 24) | (b[2] << 16) | (b[1] << 8) | (b[0]));
 }
 
 inline constexpr CryptoPP::byte* to_crc_byte(std::span<std::byte, 4> bytes) {
@@ -16,6 +14,11 @@ inline constexpr CryptoPP::byte* to_crc_byte(std::span<std::byte, 4> bytes) {
 }
 
 namespace Ext4 {
+    /**
+     *  Calcula o checksum do superbloco
+     *  @param super: `std::span<const std::byte>` que representa o superbloco do ext4
+     *  @returns  inteiro 32 bits que corresponde ao checksum
+     */
     uint32_t checksum_superblock(std::span<const std::byte> super) {
         crc.Restart();
         crc.Update(reinterpret_cast<const byte*>(super.data()), super.size());
@@ -24,7 +27,15 @@ namespace Ext4 {
         return (bytearray_to_int32_le(digest) ^ 0xFFFFFFFF);
     }
 
-    uint16_t checksum_group(std::span<const std::byte> uuid, int32_t group_number, std::span<const std::byte> group) {
+
+    /**
+     *  Calcula o checksum do descritor de grupos
+     *  @param uuid: vetor de bytes (tamanho 16) que corresponde ao uuid do superbloco
+     *  @param group_number: número do grupo
+     *  @param group: `std::span<const std::byte>` que corresponde ao descritor do grupo group_number
+     *  @returns  inteiro 16 bits que corresponde ao checksum
+     */
+    uint16_t checksum_group(std::span<const std::byte, 16> uuid, int32_t group_number, std::span<const std::byte> group) {
         uint16_t dummy_csum = 0;
         crc.Restart();
     
@@ -49,7 +60,13 @@ namespace Ext4 {
         return ((bytearray_to_int32_le(digest) ^ 0xFFFFFFFF) & 0XFFFF);
     }
 
-    uint32_t checksum_bitmap(std::span<const std::byte> uuid, std::span<const std::byte> bitmap) {
+    /**
+     * Calcula o checksum do bitmap
+     * @param uuid: span fixo de 16 bytes correspondente ao UUID do superbloco
+     * @param bitmap: span dinâmico contendo os bytes do bitmap (bloco ou inode)
+     * @returns inteiro de 32 bits correspondente ao checksum
+     */
+    uint32_t checksum_bitmap(std::span<const std::byte, 16> uuid, std::span<const std::byte> bitmap) {
         crc.Restart();
         
         // 1. UUID (estático, sempre 16 bytes)
@@ -63,7 +80,15 @@ namespace Ext4 {
         return (bytearray_to_int32_le(digest) ^ 0xFFFFFFFF);
     }
 
-    uint32_t checksum_inode(std::span<const std::byte> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> inode) {
+    /**
+     * Calcula o checksum dos inodes
+     * @param uuid: span fixo de 16 bytes correspondente ao UUID do superbloco
+     * @param inode_number: número do inode
+     * @param inode_gen: campo do inode i_generation
+     * @param inode: span contendo os bytes do inode (deve ter pelo menos 256 bytes)
+     * @returns inteiro de 32 bits correspondente ao checksum
+     */
+    uint32_t checksum_inode(std::span<const std::byte, 16> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> inode) {
         uint16_t dummy_csum = 0;
 
         crc.Restart();
@@ -100,7 +125,15 @@ namespace Ext4 {
         return (bytearray_to_int32_le(digest) ^ 0xFFFFFFFF);
     }
 
-    uint32_t checksum_dir(std::span<const std::byte> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> dir) {
+    /**
+     * Calcula o checksum dos diretórios
+     * @param uuid: span fixo de 16 bytes correspondente ao UUID do superbloco
+     * @param inode_number: número do inode
+     * @param inode_gen: campo do inode i_generation
+     * @param dir: span contendo os bytes do bloco do diretório (tamanho dinâmico)
+     * @returns inteiro de 32 bits correspondente ao checksum
+     */
+    uint32_t checksum_dir(std::span<const std::byte, 16> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> dir) {     
         crc.Restart();
         
         // 1. UUID (16 bytes)
@@ -113,15 +146,23 @@ namespace Ext4 {
         crc.Update(reinterpret_cast<const byte*>(&inode_gen), sizeof(inode_gen));
         
         // 4. Diretório: Todo o bloco, exceto os últimos 12 bytes da estrutura ext4_dir_entry_tail
-        auto dir_data = dir.subspan(0, dir.size() - 12);
-        crc.Update(reinterpret_cast<const byte*>(dir_data.data()), dir_data.size());
+        auto dados_diretorio = dir.subspan(0, dir.size() - 12);
+        crc.Update(reinterpret_cast<const byte*>(dados_diretorio.data()), dados_diretorio.size());
         
         crc.Final(to_crc_byte(digest));
 
         return (bytearray_to_int32_le(digest) ^ 0xFFFFFFFF);
     }
 
-    uint32_t checksum_extent(std::span<const std::byte> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> extent) {
+    /**
+     * Calcula o checksum dos extents
+     * @param uuid: span fixo de 16 bytes correspondente ao UUID do superbloco
+     * @param inode_number: número do inode
+     * @param inode_gen: campo do inode i_generation
+     * @param extent: span contendo os bytes do bloco de extents (tamanho dinâmico)
+     * @returns inteiro de 32 bits correspondente ao checksum
+     */
+    uint32_t checksum_extent(std::span<const std::byte, 16> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> extent) {
         
         crc.Restart();
         

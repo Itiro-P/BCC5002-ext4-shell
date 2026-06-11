@@ -23,7 +23,7 @@ namespace Ext4::Raw {
         uint16_t  i_gid;            // 16 bits inferiores do GID do grupo
         uint16_t  i_links_count;    // Contador de ligações físicas (Hard links)
         uint32_t  i_blocks_lo;      // 32 bits inferiores do contador de blocos alocados (setores de 512B)
-        uint32_t  i_flags;          // Flags de comportamento do ficheiro (ver `Flags::InodeFlags`)
+        uint32_t  i_flags;          // Flags de comportamento do ficheiro (ver `InodeFlags`)
         
         Flags::Osd1Linux i_osd1;           // Campos específicos do SO criador (Mapeado para Linux)
         

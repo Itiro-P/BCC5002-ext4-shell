@@ -6,33 +6,9 @@
 namespace Ext4::Wrappers {
     class GroupDescriptor {
         Raw::GroupDescriptor raw;
-        const uint32_t _id;
-        const bool _is_64;
+        bool _is_64;
     public:
-        GroupDescriptor(const Raw::GroupDescriptor &raw, const uint32_t id, const bool is_64): raw(raw), _id(id), _is_64(is_64) {}
-
-        /**
-         * @brief Retorna o id deste grupo.
-         */
-        uint32_t get_id() const {
-            return this->_id;
-        }
-
-        /**
-         * @brief Retorna o checksum guardado no inode.
-         */
-        uint16_t get_checksum() const {
-            return this->raw.bg_checksum;
-        }
-
-        /**
-         * @brief Calcula o checksum e valida a estrutura interna.
-         * @param uuid `std::span<std::byte>` correspondente ao UUID do superbloco
-         */
-        bool validate_checksum(std::span<const std::byte> uuid) {
-            uint16_t checksum = Ext4::checksum_group(uuid, this->get_id(), Utils::as_byte_span(this->get_raw()));
-            return (this->get_checksum() == checksum);
-        }
+        GroupDescriptor(const Raw::GroupDescriptor &raw, bool is_64): raw(raw), _is_64(is_64) {}
 
         /**
          * @brief Retorna o número do bloco físico que contém o bitmap de blocos deste grupo. Para imagens EXT4 de 64 bits, este valor é composto por bg_block_bitmap_lo e bg_block_bitmap_hi. Para imagens sem suporte a 64 bits, apenas bg_block_bitmap_lo é usado.

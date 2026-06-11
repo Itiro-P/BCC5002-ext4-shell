@@ -7,6 +7,7 @@
 #include <string>
 
 namespace Ext4::Wrappers {
+
 class SuperBlock {
     Raw::SuperBlock raw;
     bool _is_64 = false;
@@ -21,17 +22,10 @@ public:
     Raw::SuperBlock get_raw() const;
 
     /**
-     * @brief Retorna o checksum guardado.
+     * @brief Valida a assinatura mágica e campos críticos do SuperBlock.
+     * @throws `std::runtime_error` se a assinatura mágica for diferente de `0xEF53`.
      */
-    uint32_t get_checksum() const {
-        return this->raw.s_checksum;
-    }
-
-    /**
-     * @brief Valida a assinatura mágica e checksum do SuperBlock.
-     * @throws `std::runtime_error` se a assinatura mágica for diferente de `0xEF53` ou o cálculo de checksum for incorreto.
-     */
-    void validate();
+    void validate() const;
 
     /**
      * @brief Indica se a imagem usa campos de 64 bits no GroupDescriptor.
@@ -171,12 +165,6 @@ public:
      * Exibido em `info`.
      */
     std::string get_uuid() const;
-
-    /**
-     * @brief UUID do filesystem no formato padrão com hífens.
-     * Exibido em `info`.
-     */
-    std::span<const std::byte> get_bytes_uuid() const;
 
     /**
      * @brief Timestamp Unix da criação do filesystem (mkfs).

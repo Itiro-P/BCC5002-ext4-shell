@@ -101,7 +101,7 @@ short Command::ls(Image &img, const std::vector<std::string> &args) {
     auto [parent_dir, _] = img.resolve_path(target_path, img.get_current_inode());
 
     for(const auto &entry: img.list_dir(parent_dir)) {
-        bool is_dir = entry.is_dir();
+        inline bool is_dir = entry.is_dir();
         std::println("{}{}{}", is_dir ? "\033[32m" : "", entry.get_name(), is_dir ? "\033[0m" : "");
     }
 

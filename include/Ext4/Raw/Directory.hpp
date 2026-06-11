@@ -36,19 +36,6 @@ namespace Ext4::Raw {
 
     #pragma pack(push, 1)
     /**
-     * @brief Cauda presente de forma oculta que armazena o checksum do diretório.
-     */
-    struct DirectoryEntryTail {
-        uint32_t det_reserved_zero1;  // Sempre 0 (para parecer um inode inválido)
-        uint16_t det_rec_len;         // Tamanho deste registro (sempre 12)
-        uint8_t  det_reserved_zero2;  // Sempre 0
-        uint8_t  det_reserved_ft;     // Tipo de arquivo especial (0xDE - EXT4_FT_DIR_CSUM)
-        uint32_t det_checksum;        // O CHECKSUM REAL (CRC32c) de 32 bits
-    };
-    #pragma pack(pop)
-
-    #pragma pack(push, 1)
-    /**
      * @brief Informações de controlo da raiz de indexação HTree (struct dx_root_info).
      * Presente apenas se o Inode do diretório possuir a flag EXT4_INDEX_FL ativa.
      * Fica embutida logo após as entradas tradicionais de ponto "." e dois pontos "..".

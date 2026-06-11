@@ -8,9 +8,6 @@ namespace Ext4::Constants {
     
     // Número mágico universal que identifica um cabeçalho de nó válido na árvore de extents (0xF30A).
     inline constexpr uint16_t EXTENT_MAGIC = 0xF30A;
-
-    // Número de checksum usado na última entrada de diretório (que normalmente é oculta).
-    inline constexpr uint8_t EXT4_FT_DIR_CSUM = 0xDE;
     
     // Número mágico universal que valida o bloco MMP (0x004D4D50 -> "MMP" em ASCII).
     inline constexpr uint32_t MMP_MAGIC = 0x004D4D50;
