@@ -13,7 +13,7 @@ namespace Ext4::Raw {
      * independentemente do tamanho do bloco (1KB, 2KB, 4KB, etc.) definido no Superbloco.
      */
     struct OrphanBlockTail {
-        uint32_t ob_magic;     // Assinatura mágica de validação (Deve ser igual a Constants::ORPHAN_BLOCK_MAGIC).
+        uint32_t ob_magic;     // Assinatura mágica de validação (Deve ser igual a OrphanNS::ORPHAN_BLOCK_MAGIC).
         uint32_t ob_checksum;  // Checksum de integridade de metadados para este bloco específico (Calculado via CRC32c).
     };
     #pragma pack(pop)
