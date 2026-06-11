@@ -1,6 +1,6 @@
-#include "../../include/Ext4/Raw/SuperBlock.hpp"
+#include "../../include/Ext4/Wrappers/SuperBlock.hpp" 
 #include "../../include/Ext4/Constants.hpp"
-#include "../../include/Ext4/Wrappers/SuperBlock.hpp"
+#include "../../include/Ext4/Checksum.hpp"
 #include <stdexcept>
 #include <string>
 #include <format>
@@ -14,10 +14,16 @@ Ext4::Raw::SuperBlock Ext4::Wrappers::SuperBlock::get_raw() const {
     return this->raw;
 }
 
-void Ext4::Wrappers::SuperBlock::validate() const
-{
-    if (this->raw.s_magic != Ext4::Constants::EXT_MAGIC) {
+void Ext4::Wrappers::SuperBlock::validate() {
+    if(this->raw.s_magic != Ext4::Constants::EXT_MAGIC) {
         throw std::runtime_error("Erro: SuperBlock inválido - Assinatura mágica incorreta. O sistema de arquivos pode estar corrompido ou não ser um EXT4.");
+    }
+
+    if(this->has_metadata_csum()) {
+        uint32_t checksum = Ext4::checksum_superblock(Utils::as_byte_span(this->raw));
+        if(checksum != this->get_checksum()) {
+            throw std::runtime_error("Erro: SuperBlock inválido - Checksum incorreto. O sistema de arquivos pode estar corrompido ou não ser um EXT4.");
+        }
     }
 }
 
@@ -128,8 +134,12 @@ std::string Ext4::Wrappers::SuperBlock::get_uuid() const {
         u[8],u[9], u[10],u[11],u[12],u[13],u[14],u[15]);
 }
 
-uint32_t Ext4::Wrappers::SuperBlock::get_mkfs_time() const { 
-    return raw.s_mkfs_time; 
+std::span<const std::byte> Ext4::Wrappers::SuperBlock::get_bytes_uuid() const {
+    return Utils::as_byte_span(this->get_uuid());
+}
+uint32_t Ext4::Wrappers::SuperBlock::get_mkfs_time() const
+{
+    return raw.s_mkfs_time;
 }
 
 uint32_t Ext4::Wrappers::SuperBlock::get_mtime() const { 

@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include "../Ext4.hpp"
+#include <span>
 #include <cryptopp/crc.h>
 #include <cstdint>
 
@@ -30,11 +30,57 @@ uint32_t bytearray_to_int32_le(std::span<const std::byte, 4> b);
 inline constexpr CryptoPP::byte* to_crc_byte(std::span<std::byte, 4> bytes);
 
 namespace Ext4 {
-    /* calculo dos checksums para ext4 */
-    uint32_t checksum_superblock(char* super);
-    uint16_t checksum_group(char* uuid, int32_t group_number, char* group);
-    uint32_t checksum_bitmap(char* uuid, char* bitmap, int size);
-    uint32_t checksum_inode(char* uuid, uint32_t inode_number, uint32_t inode_gen, char* inode);
-    uint32_t checksum_dir(char* uuid, uint32_t inode_number, uint32_t inode_gen, char* dir, int blocksize);
-    uint32_t checksum_extent (char* uuid, uint32_t inode_number, uint32_t inode_gen, char* extent, int blocksize);
+    /**
+     *  Calcula o checksum do superbloco
+     *  @param super: `std::span<const std::byte>` que representa o superbloco do ext4
+     *  @returns  inteiro 32 bits que corresponde ao checksum
+     */
+    uint32_t checksum_superblock(std::span<const std::byte> super);
+    
+    /**
+     *  Calcula o checksum do descritor de grupos
+     *  @param uuid: vetor de bytes (tamanho 16) que corresponde ao uuid do superbloco
+     *  @param group_number: número do grupo
+     *  @param group: `std::span<const std::byte>` que corresponde ao descritor do grupo group_number
+     *  @returns  inteiro 16 bits que corresponde ao checksum
+     */
+    uint16_t checksum_group(std::span<const std::byte> uuid, int32_t group_number, std::span<const std::byte> group);
+    
+    /**
+     * Calcula o checksum do bitmap
+     * @param uuid: `std::span<std::byte>` correspondente ao UUID do superbloco
+     * @param bitmap: span dinâmico contendo os bytes do bitmap (bloco ou inode)
+     * @returns inteiro de 32 bits correspondente ao checksum
+     */
+    uint32_t checksum_bitmap(std::span<const std::byte> uuid, std::span<const std::byte> bitmap);
+
+    /**
+     * Calcula o checksum do inode
+     * @param uuid: `std::span<std::byte>` correspondente ao UUID do superbloco
+     * @param inode_number: número do inode
+     * @param inode_gen: campo do inode i_generation
+     * @param inode: span contendo os bytes do inode (deve ter pelo menos 256 bytes)
+     * @returns inteiro de 32 bits correspondente ao checksum
+     */
+    uint32_t checksum_inode(std::span<const std::byte> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> inode);
+    
+    /**
+     * Calcula o checksum do diretório
+     * @param uuid: `std::span<std::byte>` correspondente ao UUID do superbloco
+     * @param inode_number: número do inode
+     * @param inode_gen: campo do inode i_generation
+     * @param dir: span contendo os bytes do bloco do diretório (tamanho dinâmico)
+     * @returns inteiro de 32 bits correspondente ao checksum
+     */
+    uint32_t checksum_dir(std::span<const std::byte> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> dir);
+
+    /**
+     * Calcula o checksum dos extents
+     * @param uuid: `std::span<std::byte>` correspondente ao UUID do superbloco
+     * @param inode_number: número do inode
+     * @param inode_gen: campo do inode i_generation
+     * @param extent: span contendo os bytes do bloco de extents (tamanho dinâmico)
+     * @returns inteiro de 32 bits correspondente ao checksum
+     */
+    uint32_t checksum_extent(std::span<const std::byte> uuid, uint32_t inode_number, uint32_t inode_gen, std::span<const std::byte> extent);
 }

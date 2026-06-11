@@ -213,6 +213,7 @@ namespace Ext4::Wrappers {
          * @brief Escreve um grupo de descritores no disco.
          * @param inode_num O número do GroupDescriptor.
          * @param gd A estrutura GroupDescriptor.
+         * @throws `std::runtime_error` caso a validação de checksum falhe.
          */
         void write_gdt(uint32_t group, const Raw::GroupDescriptor &gd);
 

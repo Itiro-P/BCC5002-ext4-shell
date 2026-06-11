@@ -1,6 +1,6 @@
 CXX      := g++
 CXXFLAGS := -std=c++23 -Wall -Wextra -pedantic -O2 -lcryptopp
-DBGFLAGS := -std=c++23 -Wall -Wextra -pedantic -g -O0 -DDEBUG -fsanitize=address,undefined
+DBGFLAGS := -std=c++23 -Wall -Wextra -pedantic -lcryptopp -g -O0 -DDEBUG -fsanitize=address,undefined
 
 TARGET   := ext4shell
 SRCS     := main.cpp $(wildcard src/*.cpp) $(wildcard src/Wrappers/*.cpp)

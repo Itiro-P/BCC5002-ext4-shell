@@ -5,6 +5,7 @@
 #include <vector>
 #include <span>
 #include "../../Ext4/Raw.hpp"
+#include "../../Ext4/Checksum.hpp"
 
 namespace Ext4::Wrappers {
     /**
@@ -23,6 +24,24 @@ namespace Ext4::Wrappers {
         Inode(uint32_t id, const Raw::Inode &inode_data) : inode_id(id), raw(inode_data) {}
 
         uint32_t get_inode_id() const { return this->inode_id; }
+
+        uint32_t get_generation() const { return this->raw.i_generation; }
+
+        /**
+         * @brief Retorna o checksum guardado no inode.
+         */
+        uint32_t get_checksum() const {
+            return Utils::concatenate(this->raw.i_osd2.l_i_checksum_lo, this->raw.i_checksum_hi);
+        }
+
+        /**
+         * @brief Calcula o checksum e valida a estrutura interna.
+         * @param uuid `std::span<std::byte>` correspondente ao UUID do superbloco
+         */
+        bool validate_checksum(std::span<const std::byte> uuid) {
+            uint32_t checksum = Ext4::checksum_inode(uuid, this->get_inode_id(), this->get_raw().i_generation, Utils::as_byte_span(this->raw));
+            return (this->get_checksum() == checksum);
+        }
 
         /**
          * @brief Retorna a estrutura interna do inode.
@@ -54,7 +73,7 @@ namespace Ext4::Wrappers {
 
         bool is_file() const { return this->get_type() == Flags::S_IFREG; }
 
-        uint64_t get_size() const { return (static_cast<uint64_t>(this->raw.i_size_hi) << 32) | this->raw.i_size_lo; }
+        uint64_t get_size() const { return Utils::concatenate(this->raw.i_size_lo, this->raw.i_size_hi); }
 
         uint16_t get_links_count() const { return this->raw.i_links_count; }
 
