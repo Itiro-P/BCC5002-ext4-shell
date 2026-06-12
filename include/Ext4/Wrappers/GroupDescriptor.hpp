@@ -8,8 +8,17 @@ namespace Ext4::Wrappers {
         Raw::GroupDescriptor raw;
         bool _is_64;
         uint32_t _group_number;
+        uint16_t _desc_size;
     public:
-        GroupDescriptor(const Raw::GroupDescriptor &raw, const uint32_t group_number, const bool is_64): raw(raw), _group_number(group_number), _is_64(is_64) {}
+        GroupDescriptor(const Raw::GroupDescriptor &raw, const uint32_t group_number, const uint16_t desc_size, const bool is_64): raw(raw), _group_number(group_number), _desc_size(desc_size), _is_64(is_64) {}
+
+        /**
+         * @brief Retorna o tamanho do grupo de descritores.
+         * @return Um inteiro de 16 bits sem sinal que corresponde ao tamanho da estrutura GD.
+         */
+        uint16_t get_desc_size() const {
+            return this->_desc_size;
+        }
 
         /**
          * @brief Retorna o número que representa esste grupo.
@@ -57,12 +66,23 @@ namespace Ext4::Wrappers {
         uint16_t get_used_dirs_count() const;
 
         /**
-         * Flags — bg_flags indica se o grupo tem bitmap/inode table inicializados 
+         * @brief Flags — bg_flags indica se o grupo tem bitmap/inode table inicializados 
          * útil para detectar grupos não inicializados em imagens esparsas ou corrompidas.
          */
         uint16_t get_flags() const { 
             return raw.bg_flags; 
         }
+
+        /**
+         * @brief Retorna o checksum do bitmap de inodes
+         */
+        uint32_t get_inode_bitmap_checksum() const;
+
+        /**
+         * @brief Retorna o checksum do bitmap de blocos
+         */
+        uint32_t get_block_bitmap_checksum() const;
+
 
         /**
          * Verifica se o bitmap de inodes do grupo NÃO está inicializado.

@@ -18,7 +18,7 @@ Wrappers::Image::Image(const std::string &image_path) {
     this->image_file.open(image_path, std::ios::in | std::ios::out| std::ios::binary);
     
     if (!this->image_file.is_open()) {
-        throw std::runtime_error("Erro ao abrir a imagem: O arquivo '" + image_path + "' não existe ou está inacessível.");
+        throw std::runtime_error(std::format("Erro ao abrir a imagem: O arquivo {} não existe ou está inacessível.", image_path));
     }
 
     // Tentamos colocar o cursor de leitura no offset fixo onde o superbloco deve residir; e
@@ -43,12 +43,11 @@ Wrappers::Image::Image(const std::string &image_path) {
         Raw::GroupDescriptor gd{};
         std::streamoff offset = gdt_offset + (static_cast<uint64_t>(i) * desc_size);
         this->read_offset(offset, Utils::as_byte_span(gd, desc_size));
-
-        this->group_descriptors.push_back(Wrappers::GroupDescriptor(gd, i, is_64));
+        this->group_descriptors.push_back(Wrappers::GroupDescriptor(gd, i, desc_size, is_64));
     }
     this->current_inode = this->get_inode(2); // O diretório raiz está sempre no Inode 2.
     this->root_inode = this->current_inode;
-    std::println("Imagem lida com sucesso! Assinatura mágica verificada: 0x{:04X}\nBem-vindo ao EXT4shell!", super_block.s_magic);
+    std::println("Imagem lida com sucesso!\nBem-vindo ao EXT4shell!");
 }
 
 void Wrappers::Image::seek(const std::streamoff offset) {
@@ -128,16 +127,16 @@ std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num)
         throw std::runtime_error(std::format("Erro: Número de inode inválido ou fora dos limites: {}", inode_num));
     }
 
-    // 1. Descobrir a qual Block Group este inode pertence
+    // Descobrir a qual Block Group este inode pertence
     uint32_t group = this->get_inode_group(inode_num);
 
-    // 2. Descobrir o índice local do inode dentro da tabela daquele grupo
+    // Descobrir o índice local do inode dentro da tabela daquele grupo
     uint32_t index = this->get_inode_bit_pos(inode_num);
     
-    // 3. Buscar o offset em bytes de onde começa a tabela de inodes do grupo correspondente
+    // Buscar o offset em bytes de onde começa a tabela de inodes do grupo correspondente
     uint64_t table_base_offset = this->group_descriptors[group].get_inode_table_block() * this->super_block.get_block_size();
     
-    // 4. Calcular a posição absoluta do inode alvo
+    // Calcular a posição absoluta do inode alvo
     std::streamoff final_inode_offset = table_base_offset + (static_cast<uint64_t>(index) * this->super_block.get_inode_size());
     return final_inode_offset;
 }
@@ -158,7 +157,7 @@ Raw::Inode Wrappers::Image::get_raw_inode(const uint32_t inode_num) {
 
 Wrappers::Inode Wrappers::Image::get_inode(const uint32_t inode_num) {
     Raw::Inode inode = this->get_raw_inode(inode_num);
-    Wrappers::Inode wrapper = Wrappers::Inode(inode_num, inode);
+    Wrappers::Inode wrapper = Wrappers::Inode(inode_num, this->get_volume_uuid(), this->super_block.get_inode_size(), inode);
 
     return wrapper;
 }
@@ -339,7 +338,7 @@ void Ext4::Wrappers::Image::write_gdt(uint32_t group, const Raw::GroupDescriptor
     uint16_t desc_size = this->super_block.get_desc_size();
     std::streamoff offset = this->super_block.get_gdt_offset() + (static_cast<uint64_t>(group) * desc_size);
     this->write_offset(offset, Utils::as_byte_span(gd, desc_size));
-    this->group_descriptors[group] = Wrappers::GroupDescriptor(gd, group, this->super_block.is_64bit());
+    this->group_descriptors[group] = Wrappers::GroupDescriptor(gd, group, desc_size, this->super_block.is_64bit());
 }
 
 void Ext4::Wrappers::Image::write_superblock(const Raw::SuperBlock &sp) {
@@ -371,6 +370,7 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
 
         std::vector<std::byte> inode_bitmap(this->super_block.get_block_size());
         auto bitmap_span = Utils::as_byte_span(inode_bitmap);
+        
         this->read_block(gds[i].get_inode_bitmap_block(), bitmap_span);
 
         for (size_t j = 0; j < inode_bitmap.size() * 8; ++j) {

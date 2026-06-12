@@ -63,6 +63,11 @@ public:
     bool has_metadata_csum() const;
 
     /**
+     * @brief Indica se checksums de descritores de grupo estão ativos (`RO_COMPAT_GDT_CSUM`).
+     */
+    bool has_compat_gdt_csum() const;
+
+    /**
      * @brief Total de inodes no filesystem.
      * Usado para validar números de inode em get_raw_inode().
      */
@@ -94,7 +99,7 @@ public:
 
     /**
      * @brief Tamanho do bloco em bytes: 1024 << s_log_block_size.
-     * Valores possíveis: 1024, 2048, 4096. Usado em todo cálculo de offset.
+     * Valores possíveis: 1024, 2048, 409Usado em todo cálculo de offset.
      */
     uint32_t get_block_size() const;
 

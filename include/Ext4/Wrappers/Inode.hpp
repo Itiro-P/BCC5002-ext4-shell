@@ -14,13 +14,31 @@ namespace Ext4::Wrappers {
     private:
         // O número global do raw, começando em 2 para o diretório raiz.
         uint32_t inode_id = 0;
+        // O uuid do volume.
+        std::string _uuid;
+        // O tamanho da estrutura do inode
+        uint32_t _s_inode_size;
         // O inode encapsulado, contendo os metadados físicos do ficheiro ou diretório.
         Raw::Inode raw{};
 
     public:
         Inode() = default;
         
-        Inode(uint32_t id, const Raw::Inode &inode_data) : inode_id(id), raw(inode_data) {}
+        Inode(uint32_t id, const std::string &uuid, const uint32_t s_inode_size, const Raw::Inode &inode_data) : inode_id(id), _uuid(uuid), _s_inode_size(s_inode_size), raw(inode_data) {}
+
+        /**
+         * @brief Retorna o UUID do volume do inode em bytes. Esta é uma função de conveniência apenas.
+         */
+        std::span<const std::byte, 16> get_uuid_bytes() const {
+            return Utils::as_byte_span<16>(this->_uuid);
+        }
+
+        /**
+         * @brief Retorna o checksum dos metadados gravados (caso tenha)
+         */
+        uint32_t get_checksum() const {
+            return Utils::concatenate(this->raw.i_osd2.l_i_checksum_lo, this->raw.i_checksum_hi);
+        }
 
         /**
          * @brief Retorna o identificador do inode.
@@ -28,9 +46,14 @@ namespace Ext4::Wrappers {
         uint32_t get_inode_id() const { return this->inode_id; }
 
         /**
+         * @brief Retorna o tamanho da estrutura lida no disco.
+         */
+        uint32_t get_struct_size() const { return this->_s_inode_size; }
+
+        /**
          * @brief Retorna a versão do ficheiro (utilizado principalmente para exportações NFS
          */
-        uint32_t get_inode_generation() const { return this->get_raw().i_generation; }
+        uint32_t get_inode_generation() const { return this->raw.i_generation; }
 
         /**
          * @brief Retorna a estrutura interna do inode.

@@ -29,8 +29,21 @@ namespace Ext4::Raw {
         uint32_t inode;        // Número do inode para o qual esta entrada aponta. Se 0, a entrada está vazia.
         uint16_t rec_len;      // Tamanho total deste registo em disco (Deve ser múltiplo de 4 bytes).
         uint8_t  name_len;     // Tamanho real (em bytes) da string correspondente ao nome do ficheiro.
-        uint8_t  file_type;    // Tipo do ficheiro mapeado (Ver mapeamento em DirectoryFileType).
+        uint8_t  file_type;    // Tipo do ficheiro mapeado (Ver mapeamento em Flags::DirectoryFileType).
         // O nome do arquivo segue em linha na memória: char name[name_len]
+    };
+    #pragma pack(pop)
+
+    #pragma pack(push, 1)
+    /**
+     * @brief Cauda presente de forma oculta que armazena o checksum do diretório.
+     */
+    struct DirectoryEntryTail {
+        uint32_t det_reserved_zero1;  // Sempre 0 (para parecer um inode inválido)
+        uint16_t det_rec_len;         // Tamanho deste registro (sempre 12)
+        uint8_t  det_reserved_zero2;  // Sempre 0
+        uint8_t  det_reserved_ft;     // Tipo de arquivo especial (0xDE - EXT4_FT_DIR_CSUM)
+        uint32_t det_checksum;        // O CHECKSUM REAL (CRC32c) de 32 bits
     };
     #pragma pack(pop)
 

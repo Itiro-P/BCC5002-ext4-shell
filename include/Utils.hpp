@@ -144,8 +144,7 @@ namespace Utils {
      */
     template <size_t max_size>
     inline constexpr auto as_byte_span(Container auto &c) {
-        using ContainerType = std::remove_cvref_t<decltype(c)>;
-        return std::span<std::byte, max_size>(reinterpret_cast<std::byte*>(c.data()), c.size() * max_size);
+        return std::span<std::byte, max_size>(reinterpret_cast<std::byte*>(c.data()), max_size);
     }
 
     /**
@@ -157,8 +156,7 @@ namespace Utils {
      */
     template <size_t max_size>
     inline constexpr auto as_byte_span(const Container auto &c) {
-        using ContainerType = std::remove_cvref_t<decltype(c)>;
-        return std::span<const std::byte, max_size>(reinterpret_cast<const std::byte*>(c.data()), c.size() * max_size);
+        return std::span<const std::byte, max_size>(reinterpret_cast<const std::byte*>(c.data()), max_size);
     }
 
     /**
