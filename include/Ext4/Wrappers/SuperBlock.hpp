@@ -167,6 +167,11 @@ public:
     std::string get_uuid() const;
 
     /**
+     * @brief UUID do filesystem como bytes.
+     */
+    std::span<const std::byte, 16> get_uuid_bytes() const;
+
+    /**
      * @brief Timestamp Unix da criação do filesystem (mkfs).
      * Exibido em `info`.
      */

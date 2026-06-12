@@ -22,7 +22,15 @@ namespace Ext4::Wrappers {
         
         Inode(uint32_t id, const Raw::Inode &inode_data) : inode_id(id), raw(inode_data) {}
 
+        /**
+         * @brief Retorna o identificador do inode.
+         */
         uint32_t get_inode_id() const { return this->inode_id; }
+
+        /**
+         * @brief Retorna a versão do ficheiro (utilizado principalmente para exportações NFS
+         */
+        uint32_t get_inode_generation() const { return this->get_raw().i_generation; }
 
         /**
          * @brief Retorna a estrutura interna do inode.

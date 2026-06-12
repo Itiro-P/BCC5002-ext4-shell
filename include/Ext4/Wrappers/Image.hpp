@@ -135,6 +135,14 @@ namespace Ext4::Wrappers {
             return this->current_path;
         }
 
+        std::string get_volume_uuid() const {
+            return this->super_block.get_uuid();
+        }
+
+        std::span<const std::byte, 16> get_volume_uuid_bytes() const {
+            return this->super_block.get_uuid_bytes();
+        }
+
         /**
          * @brief Retorna uma lista de entradas de um inode.
          * @param inode o Inode a ser listado.

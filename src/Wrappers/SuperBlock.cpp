@@ -128,6 +128,10 @@ std::string Ext4::Wrappers::SuperBlock::get_uuid() const {
         u[8],u[9], u[10],u[11],u[12],u[13],u[14],u[15]);
 }
 
+std::span<const std::byte, 16> Ext4::Wrappers::SuperBlock::get_uuid_bytes() const {
+    return Utils::as_byte_span<16>(this->get_raw().s_uuid);
+}
+
 uint32_t Ext4::Wrappers::SuperBlock::get_mkfs_time() const { 
     return raw.s_mkfs_time; 
 }

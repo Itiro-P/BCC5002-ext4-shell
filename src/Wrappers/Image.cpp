@@ -42,9 +42,9 @@ Wrappers::Image::Image(const std::string &image_path) {
     for (uint32_t i = 0; i < group_count; i++) {
         Raw::GroupDescriptor gd{};
         std::streamoff offset = gdt_offset + (static_cast<uint64_t>(i) * desc_size);
-        this->read_offset(offset, Utils::as_byte_span(gd));
+        this->read_offset(offset, Utils::as_byte_span(gd, desc_size));
 
-        this->group_descriptors.push_back(Wrappers::GroupDescriptor(gd, is_64));
+        this->group_descriptors.push_back(Wrappers::GroupDescriptor(gd, i, is_64));
     }
     this->current_inode = this->get_inode(2); // O diretório raiz está sempre no Inode 2.
     this->root_inode = this->current_inode;
@@ -55,7 +55,6 @@ void Wrappers::Image::seek(const std::streamoff offset) {
     this->image_file.clear(); 
 
     this->image_file.seekg(offset, std::ios::beg);
-
     this->image_file.seekp(offset, std::ios::beg);
 
     if (!this->image_file) {
@@ -258,25 +257,36 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
     // Começamos com o caminho base atual
     std::string final_path = is_root ? "/" : this->get_current_path();
 
+    // Percorremos cada diretório para montar o caminho.
     for (const auto &it : paths) {
+        // Será que temos um inode válido?
         if (inode.get_type() != Flags::S_IFDIR) {
             std::println(std::cerr, "Erro: O componente {} não é um diretório.", it);
+            // Fallback
             return {base, this->get_current_path()};
         }
+        // Agora sabemos que temos um inode que representa um diretório...
         auto entries = this->list_dir(inode);
         bool found = false;
+        // Agora vemos se o inode contém uma parte do caminho.
         for (const auto &entry : entries) {
             if (entry.get_name() == it) {
+                // Achamos!
                 inode = this->get_inode(entry.get_inode());
                 found = true;
 
+                // Caso queremos que volte para o pai.
                 if (it == "..") {
                     size_t last_slash = final_path.find_last_of('/');
+                    // Voltamos para o diretório anterior (vinculado ao ..)
                     if (last_slash != std::string::npos && last_slash > 0) {
                         final_path = final_path.substr(0, last_slash);
+
+                    // std::string::npos indica que não achamos um diretório válido. Damos um fallback para o root.
                     } else {
                         final_path = "/";
                     }
+                // Pode ocorrer? Pode ocorrer, mas não entendo como alguém vai fazer '/root/././././pasta'
                 } else if (it != ".") {
                     if (final_path.back() != '/') final_path += "/";
                     final_path += entry.get_name();
@@ -303,12 +313,12 @@ std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::
     while (offset < inode.get_size()) {
         std::span<const std::byte> current_view(bytes.data() + offset, bytes.size() - offset);
 
-        auto entry = Utils::copy<Raw::DirectoryEntry>(current_view);
+        Raw::DirectoryEntry entry = Utils::copy<Raw::DirectoryEntry>(current_view);
 
         if (entry.rec_len == 0) break;
 
         if (entry.inode != 0) {
-            auto name_span = current_view.subspan(sizeof(Raw::DirectoryEntry), entry.name_len);
+            std::span<const std::byte> name_span = current_view.subspan(sizeof(Raw::DirectoryEntry), entry.name_len);
             entries.push_back({entry, std::string{
                 reinterpret_cast<const char*>(name_span.data()), 
                 name_span.size()
@@ -322,13 +332,14 @@ std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::
 
 void Ext4::Wrappers::Image::write_inode(const uint32_t inode_num, const Raw::Inode &inode) {
     std::streamoff offset = this->get_inode_offset(inode_num);
-    this->write_offset(offset, Utils::as_byte_span(inode));
+    this->write_offset(offset, Utils::as_byte_span(inode, this->super_block.get_inode_size()));
 }
 
 void Ext4::Wrappers::Image::write_gdt(uint32_t group, const Raw::GroupDescriptor &gd) {
-    std::streamoff offset = this->super_block.get_gdt_offset() + (static_cast<uint64_t>(group) * this->super_block.get_desc_size());
-    this->write_offset(offset, Utils::as_byte_span(gd));
-    this->group_descriptors[group] = Wrappers::GroupDescriptor(gd, this->super_block.is_64bit());
+    uint16_t desc_size = this->super_block.get_desc_size();
+    std::streamoff offset = this->super_block.get_gdt_offset() + (static_cast<uint64_t>(group) * desc_size);
+    this->write_offset(offset, Utils::as_byte_span(gd, desc_size));
+    this->group_descriptors[group] = Wrappers::GroupDescriptor(gd, group, this->super_block.is_64bit());
 }
 
 void Ext4::Wrappers::Image::write_superblock(const Raw::SuperBlock &sp) {
@@ -378,10 +389,9 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
     if (!stop) throw std::runtime_error("Sem espaço: nenhum inode livre disponível.");
 
     Wrappers::GroupDescriptor to_change = gds[gd_id];
-
     Raw::GroupDescriptor new_raw = to_change.get_raw();
     
-    uint32_t new_inode_count = Utils::concatenate(new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi) - 1;
+    uint32_t new_inode_count = to_change.get_free_inodes_count() -1;
     Utils::split(new_inode_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
 
     to_change.set_raw(new_raw);
@@ -423,10 +433,9 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
     if (!stop) throw std::runtime_error("Sem espaço: nenhum bloco livre disponível.");
 
     Wrappers::GroupDescriptor to_change = gds[gd_id];
-
     Raw::GroupDescriptor new_raw = to_change.get_raw();
-    
-    uint32_t new_block_count = Utils::concatenate(new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi) - 1;
+
+    uint32_t new_block_count = to_change.get_free_blocks_count() -1;
     Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
 
     to_change.set_raw(new_raw);
@@ -455,11 +464,10 @@ void Ext4::Wrappers::Image::free_inode(const uint32_t ino) {
     } else return;
 
     Wrappers::GroupDescriptor to_change = gds[group];
-
     Raw::GroupDescriptor new_raw = to_change.get_raw();
     
-    uint32_t new_inodes_count = Utils::concatenate(new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi) + 1;
-    Utils::split(new_inodes_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
+    uint32_t new_inodes_count = to_change.get_free_inodes_count() +1;
+    Utils::split(new_inodes_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_lo);
 
     to_change.set_raw(new_raw);
     this->write_gdt(group, new_raw);
@@ -483,11 +491,10 @@ void Ext4::Wrappers::Image::free_block(const uint32_t blk) {
     } else return;
 
     Wrappers::GroupDescriptor to_change = gds[group];
-
     Raw::GroupDescriptor new_raw = to_change.get_raw();
     
-    uint32_t new_blocks_count = Utils::concatenate(new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi) + 1;
-    Utils::split(new_blocks_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
+    uint32_t new_block_count = to_change.get_free_blocks_count() +1;
+    Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
 
     to_change.set_raw(new_raw);
     this->write_gdt(group, new_raw);

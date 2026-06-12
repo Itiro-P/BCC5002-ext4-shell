@@ -127,12 +127,38 @@ namespace Utils {
 
     /**
      * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
-     * @param c Ocontainer.
+     * @param c O container.
      * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
      */
     inline constexpr auto as_byte_span(const Container auto &c) {
         using ContainerType = std::remove_cvref_t<decltype(c)>;
         return std::span(reinterpret_cast<const std::byte*>(c.data()), c.size() * sizeof(typename ContainerType::value_type));
+    }
+
+    /**
+     * @brief Cria um `std::span<std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
+     * @param c O container.
+     * @param max_size O máximo de bytes que devem ser aplicados.
+     * @details Exemplo de uso `Utils::as_byte_span<16>(container)`.
+     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
+     */
+    template <size_t max_size>
+    inline constexpr auto as_byte_span(Container auto &c) {
+        using ContainerType = std::remove_cvref_t<decltype(c)>;
+        return std::span<std::byte, max_size>(reinterpret_cast<std::byte*>(c.data()), c.size() * max_size);
+    }
+
+    /**
+     * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
+     * @param c O container.
+     * @param max_size O máximo de bytes que devem ser aplicados.
+     * @details Exemplo de uso `Utils::as_byte_span<16>(container)`.
+     * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
+     */
+    template <size_t max_size>
+    inline constexpr auto as_byte_span(const Container auto &c) {
+        using ContainerType = std::remove_cvref_t<decltype(c)>;
+        return std::span<const std::byte, max_size>(reinterpret_cast<const std::byte*>(c.data()), c.size() * max_size);
     }
 
     /**
@@ -194,6 +220,26 @@ namespace Utils {
      */
     inline constexpr auto as_byte_span(const Object auto &o) {
         return std::span(reinterpret_cast<const std::byte*>(&o), sizeof(o));
+    }
+
+    /**
+     * @brief Cria um `std::span<std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
+     * @param c O objeto.
+     * @param range O tamanho da estrutura (Estruturas como o grupo de descritores podem ter mais de um tamanho a depender da arquitetura 32 ou 64 bits por exemplo).
+     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
+     */
+    inline constexpr auto as_byte_span(Object auto &o, const size_t range) {
+        return std::span(reinterpret_cast<std::byte*>(&o), range);
+    }
+
+    /**
+     * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
+     * @param c O objeto.
+     * @param range O tamanho da estrutura (Estruturas como o grupo de descritores podem ter mais de um tamanho a depender da arquitetura 32 ou 64 bits por exemplo).
+     * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
+     */
+    inline constexpr auto as_byte_span(const Object auto &o, const size_t range) {
+        return std::span(reinterpret_cast<const std::byte*>(&o), range);
     }
 
     /**

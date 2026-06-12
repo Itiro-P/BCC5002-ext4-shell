@@ -7,8 +7,17 @@ namespace Ext4::Wrappers {
     class GroupDescriptor {
         Raw::GroupDescriptor raw;
         bool _is_64;
+        uint32_t _group_number;
     public:
-        GroupDescriptor(const Raw::GroupDescriptor &raw, bool is_64): raw(raw), _is_64(is_64) {}
+        GroupDescriptor(const Raw::GroupDescriptor &raw, const uint32_t group_number, const bool is_64): raw(raw), _group_number(group_number), _is_64(is_64) {}
+
+        /**
+         * @brief Retorna o número que representa esste grupo.
+         * @return Um inteiro de 32 bits sem sinal que corresponde ao ID desse grupo.
+         */
+        uint32_t get_group_number() const {
+            return this->_group_number;
+        }
 
         /**
          * @brief Retorna o número do bloco físico que contém o bitmap de blocos deste grupo. Para imagens EXT4 de 64 bits, este valor é composto por bg_block_bitmap_lo e bg_block_bitmap_hi. Para imagens sem suporte a 64 bits, apenas bg_block_bitmap_lo é usado.
