@@ -68,6 +68,11 @@ namespace Ext4::Wrappers {
         uint32_t get_free_inodes_count() const;
 
         /**
+         * @brief Retorna a quantidade de inodes não usados na tabela.
+         */
+        uint32_t get_itable_unused() const;
+
+        /**
          * @brief Retorna a quantidade de inodes que são diretórios neste grupo. Para imagens EXT4 de 64 bits, este valor é composto por bg_used_dirs_count_lo e bg_used_dirs_count_hi. Para imagens sem suporte a 64 bits, apenas bg_used_dirs_count_lo é usado.
          * Este valor é exibido em `info` para dar uma ideia da quantidade de diretórios presentes no grupo, mas não é usado para controle de alocação.
          */

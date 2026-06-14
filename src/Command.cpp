@@ -216,6 +216,7 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
         .i_links_count = 1,
         .i_flags     = Flags::InodeFlags::EXT4_EXTENTS_FL,  // EXT4_EXTENTS_FL
         .i_size_hi   = 0,
+        .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize,
 
     };
 

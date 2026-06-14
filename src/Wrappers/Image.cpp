@@ -487,6 +487,9 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
     uint32_t new_inode_count = to_change.get_free_inodes_count() -1;
     Utils::split(new_inode_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
     
+    uint32_t new_itable_unused = to_change.get_itable_unused() -1;
+    Utils::split(new_itable_unused, new_raw.bg_itable_unused_lo, new_raw.bg_itable_unused_hi);
+
     to_change.set_raw(new_raw);
     this->write_gdt(to_change);
 
@@ -595,6 +598,9 @@ void Ext4::Wrappers::Image::free_inode(const uint32_t ino) {
     
     uint32_t new_inodes_count = to_change.get_free_inodes_count() +1;
     Utils::split(new_inodes_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
+
+    uint32_t new_itable_unused = to_change.get_itable_unused() +1;
+    Utils::split(new_itable_unused, new_raw.bg_itable_unused_lo, new_raw.bg_itable_unused_hi);
 
     to_change.set_raw(new_raw);
     this->write_gdt(to_change);
