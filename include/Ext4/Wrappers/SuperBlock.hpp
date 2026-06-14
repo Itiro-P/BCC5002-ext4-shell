@@ -116,6 +116,11 @@ public:
     uint32_t get_inodes_per_group() const;
 
     /**
+     * @brief Número de clusters contidos em cada Grupo de Blocos.
+     */
+    uint32_t get_clusters_per_group() const;
+
+    /**
      * @brief Tamanho de cada inode no disco em bytes (tipicamente 128 ou 256).
      * Usado para calcular o offset de um inode dentro da tabela de inodes.
      */
@@ -174,7 +179,17 @@ public:
     /**
      * @brief UUID do filesystem como bytes.
      */
-    std::span<const std::byte, 16> get_uuid_bytes() const;
+    std::span<const std::byte> get_uuid_bytes() const;
+
+    /**
+     * @brief Retorna a semente pré-gerada para cálculo dos checksums (normalmente UUID)
+     */
+    uint32_t get_checksum_seed() const;
+
+    /**
+     * @brief Verifica se o superbloco tem uma semente pré-gerada.
+     */
+    bool has_checksum_seed() const;
 
     /**
      * @brief Timestamp Unix da criação do filesystem (mkfs).

@@ -16,7 +16,8 @@ namespace Ext4::Raw {
         EXT4_FT_BLKDEV   = 4, // Dispositivo de blocos (Block device).
         EXT4_FT_FIFO     = 5, // Fila FIFO / Pipe nomeado.
         EXT4_FT_SOCK     = 6, // Socket Unix.
-        EXT4_FT_SYMLINK  = 7  // Ligação simbólica (Symbolic link).
+        EXT4_FT_SYMLINK  = 7,  // Ligação simbólica (Symbolic link).
+        EXT4_FT_DIR_CSUM = 0xDE  // Entrada falsa de tail de checksum
     };
 
     #pragma pack(push, 1)
@@ -29,7 +30,7 @@ namespace Ext4::Raw {
         uint32_t inode;        // Número do inode para o qual esta entrada aponta. Se 0, a entrada está vazia.
         uint16_t rec_len;      // Tamanho total deste registo em disco (Deve ser múltiplo de 4 bytes).
         uint8_t  name_len;     // Tamanho real (em bytes) da string correspondente ao nome do ficheiro.
-        uint8_t  file_type;    // Tipo do ficheiro mapeado (Ver mapeamento em Flags::DirectoryFileType).
+        uint8_t  file_type;    // Tipo do ficheiro mapeado (Ver mapeamento em DirectoryFileType).
         // O nome do arquivo segue em linha na memória: char name[name_len]
     };
     #pragma pack(pop)
@@ -86,6 +87,7 @@ namespace Ext4::Raw {
 
     // Asserções estáticas para assegurar conformidade milimétrica com o layout do Kernel Linux
     static_assert(sizeof(DirectoryEntry) == 8, "A estrutura base DirectoryEntry deve medir exatamente 8 bytes!");
+    static_assert(sizeof(DirectoryEntryTail) == 12, "DirectoryEntryTail deve ter exatamente 12 bytes!");
     static_assert(sizeof(DxRootInfo)     == 8, "A estrutura DxRootInfo deve medir exatamente 8 bytes!");
     static_assert(sizeof(DxEntry)        == 8, "A estrutura DxEntry deve medir exatamente 8 bytes!");
     static_assert(sizeof(DxTail)         == 8, "A estrutura DxTail deve medir exatamente 8 bytes!");

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 #include <span>
+#include <optional>
 #include "../../Ext4/Raw.hpp"
 
 namespace Ext4::Wrappers {
@@ -20,17 +21,29 @@ namespace Ext4::Wrappers {
         uint32_t _s_inode_size;
         // O inode encapsulado, contendo os metadados físicos do ficheiro ou diretório.
         Raw::Inode raw{};
-
+        // Os bytes excedentes que vão além dos 160 bytes padrão do inode que o superbloco coloca para funcionalidades extras
+        std::vector<std::byte> _excess_bytes;
     public:
         Inode() = default;
         
-        Inode(uint32_t id, const std::string &uuid, const uint32_t s_inode_size, const Raw::Inode &inode_data) : inode_id(id), _uuid(uuid), _s_inode_size(s_inode_size), raw(inode_data) {}
-
+        Inode(uint32_t id, 
+            const std::string &uuid, 
+            const uint32_t s_inode_size, 
+            const Raw::Inode &inode_data,
+            const std::vector<std::byte> &excess_bytes) : inode_id(id), _uuid(uuid), _s_inode_size(s_inode_size), raw(inode_data), _excess_bytes(excess_bytes) {}
+        
         /**
          * @brief Retorna o UUID do volume do inode em bytes. Esta é uma função de conveniência apenas.
          */
-        std::span<const std::byte, 16> get_uuid_bytes() const {
-            return Utils::as_byte_span<16>(this->_uuid);
+        std::span<const std::byte> get_uuid_bytes() const {
+            return Utils::as_byte_span(this->_uuid, std::optional<unsigned int>(16));
+        }
+
+        /**
+         * @brief Os bytes excedentes que vão além dos 160 bytes padrão do inode que o superbloco coloca para funcionalidades extras
+         */
+        std::vector<std::byte> get_excess_bytes() const {
+            return _excess_bytes;
         }
 
         /**
@@ -47,6 +60,7 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Retorna o tamanho da estrutura lida no disco.
+         * No caso, confie mais em `Raw::Inode`
          */
         uint32_t get_struct_size() const { return this->_s_inode_size; }
 

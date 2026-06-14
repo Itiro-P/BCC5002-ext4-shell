@@ -205,17 +205,20 @@ namespace Ext4::Flags {
     };
 
     struct Osd1Linux {
-        uint32_t l_i_version;       
+        uint32_t l_i_version;
     };
 
     #pragma pack(push, 1)
     struct Osd2Linux {
-        uint16_t l_i_blocks_high;   
-        uint16_t l_i_file_acl_high; 
-        uint16_t l_i_uid_high;      
-        uint16_t l_i_gid_high;      
-        uint16_t l_i_checksum_lo;   
-        uint16_t l_i_reserved;      
+        uint16_t l_i_blocks_high;
+        uint16_t l_i_file_acl_high;
+        uint16_t l_i_uid_high;
+        uint16_t l_i_gid_high;
+        uint16_t l_i_checksum_lo;
+        uint16_t l_i_reserved;
     };
     #pragma pack(pop)
+
+    static_assert(sizeof(Flags::Osd1Linux) == 4);
+    static_assert(sizeof(Flags::Osd2Linux) == 12);
 }

@@ -7,6 +7,7 @@
 #include <vector>
 #include <ranges>
 #include <algorithm>
+#include <optional>
 
 /**
  * @brief Arquivo de cabeçalho que inclui definições e declarações de utilitários comuns usados em todo o projeto.
@@ -40,155 +41,99 @@ namespace Utils {
         hi = static_cast<Hi>(value >> lo_bits);
     }
 
+    /**
+     * @brief É um container
+     */
     template <typename T>
     concept Container = requires(T &t) { t.data(); t.size(); };
 
+    /**
+     * @brief É um objeto (não uma coleção)
+     */
     template <typename T>
     concept Object = !Container<T>;
 
     /**
-     * @brief Lê uma estrutura inteira diretamente a partir de um container de bytes de forma segura.
+     * @brief Lê uma estrutura inteira diretamente a partir de um container de bytes.
+     * @param src O container
+     * @param count (Opcional) O número de bytes que deve ser lido e copiado.
      */
     template <typename T, Container C>
-    inline constexpr T copy(const C &src) {
-        if (src.size() < sizeof(T)) {
-            throw std::runtime_error("Erro de buffer: dados insuficientes para ler a estrutura.");
-        }
-        
-        T obj{};
-        std::copy_n(std::to_address(src.data()), sizeof(T), reinterpret_cast<std::byte*>(&obj));
-        return obj;
-    }
+    inline constexpr T copy(const C &src, const std::optional<size_t> count = std::nullopt) {
+        size_t to_copy = count.value_or(sizeof(T));
 
-    /**
-     * @brief Lê uma estrutura copiando apenas 'n' bytes a partir de um container.
-     */
-    template <typename T, Container C, typename S = std::size_t>
-    inline constexpr T copy(const C &src, const S n) {
-        const std::size_t bytes_to_copy = static_cast<std::size_t>(n);
-
-        if (src.size() < bytes_to_copy || sizeof(T) < bytes_to_copy) {
+        if (src.size() < to_copy || sizeof(T) < to_copy)
             throw std::runtime_error("Erro de buffer: tamanho de cópia inválido ou dados insuficientes.");
-        }
-        
-        T obj{}; // Garante que bytes não copiados fiquem zerados
-        
-        std::copy_n(std::to_address(src.data()), bytes_to_copy, reinterpret_cast<std::byte*>(&obj));
-        
-        return obj;
-    }
 
-    /**
-     * @brief Lê uma estrutura copiando apenas 'n' bytes a partir de um span.
-     */
-    template <typename T, typename S = std::size_t>
-    inline constexpr T copy(std::span<const std::byte> src, const S n) {
-        if (src.size() < static_cast<std::size_t>(n) || sizeof(T) < static_cast<std::size_t>(n)) {
-            throw std::runtime_error("Erro de buffer: tamanho de cópia inválido ou dados insuficientes.");
-        }
-        
         T obj{};
-        
-        std::copy_n(std::to_address(src.data()), n, reinterpret_cast<std::byte*>(&obj));
+        std::copy_n(std::to_address(src.data()), to_copy, reinterpret_cast<std::byte*>(&obj));
         return obj;
-    }
-
-    /**
-     * @brief Lê uma estrutura a partir de um container, limitando a cópia automaticamente 
-     * ao tamanho da estrutura ou a um limite máximo informado (o que for menor).
-     */
-    template <typename T, Container C>
-    inline constexpr T copy_bounded(const C &src, std::size_t max_size) {
-        std::size_t bytes_to_copy = std::min(sizeof(T), max_size);
-        
-        return copy<T>(src, bytes_to_copy);
     }
 
     /**
      * @brief Escreve uma estrutura em um container de bytes.
+     * @param dst Um container de destino.
+     * @param src A estrutura/objeto a ser escrita no container.
      */
-    template <typename T, Container C>
-    inline constexpr void write_to(C &dst, const T &src) {
-        if (dst.size() * sizeof(typename C::value_type) < sizeof(T))
+    template <Object O, Container C>
+    inline constexpr void write_to(C &dst, const O &src) {
+        if (dst.size() * sizeof(typename C::value_type) < sizeof(O))
             throw std::runtime_error("Buffer insuficiente para escrever a estrutura.");
             
-        std::copy_n(reinterpret_cast<const std::byte*>(&src), sizeof(T), reinterpret_cast<std::byte*>(dst.data()));
+        std::copy_n(reinterpret_cast<const std::byte*>(&src), sizeof(O), reinterpret_cast<std::byte*>(dst.data()));
     }
 
     /**
-     * @brief Cria um `std::span<std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
+     * @brief Cria um `std::span<std::byte>` a partir de um container (será interpretado como bytes puros).
      * @param c O container.
-     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
-     */
-    inline constexpr auto as_byte_span(Container auto &c) {
-        using ContainerType = std::remove_cvref_t<decltype(c)>;
-        return std::span(reinterpret_cast<std::byte*>(c.data()), c.size() * sizeof(typename ContainerType::value_type));
-    }
-
-    /**
-     * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
-     * @param c O container.
-     * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
-     */
-    inline constexpr auto as_byte_span(const Container auto &c) {
-        using ContainerType = std::remove_cvref_t<decltype(c)>;
-        return std::span(reinterpret_cast<const std::byte*>(c.data()), c.size() * sizeof(typename ContainerType::value_type));
-    }
-
-    /**
-     * @brief Cria um `std::span<std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
-     * @param c O container.
-     * @param max_size O máximo de bytes que devem ser aplicados.
-     * @details Exemplo de uso `Utils::as_byte_span<16>(container)`.
-     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
-     */
-    template <size_t max_size>
-    inline constexpr auto as_byte_span(Container auto &c) {
-        return std::span<std::byte, max_size>(reinterpret_cast<std::byte*>(c.data()), max_size);
-    }
-
-    /**
-     * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um container, garantindo que o tipo seja tratado como bytes.
-     * @param c O container.
-     * @param max_size O máximo de bytes que devem ser aplicados.
-     * @details Exemplo de uso `Utils::as_byte_span<16>(container)`.
-     * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
-     */
-    template <size_t max_size>
-    inline constexpr auto as_byte_span(const Container auto &c) {
-        return std::span<const std::byte, max_size>(reinterpret_cast<const std::byte*>(c.data()), max_size);
-    }
-
-    /**
-     * @brief Cria um `std::span<T>` a partir de um container const,
-     * preservando o tipo do elemento sem conversão para bytes.
+     * @param offset (opcional) O offset (em elementos) para começar a ler do container.
+     * @param count (opcional) Quantos bytes deverão ser incluidos no `std::span`.
      */
     template <Container C>
-    inline constexpr auto as_span(C &c) {
-        using ValueType = typename std::remove_cvref_t<C>::value_type;
-        return std::span<ValueType>(c.data(), c.size());
+    inline constexpr auto as_byte_span(C &&c, const std::optional<size_t> offset = std::nullopt, const std::optional<size_t> count = std::nullopt) {
+        using Elem = std::conditional_t<std::is_const_v<std::remove_reference_t<C>>, const std::byte, std::byte>;
+        size_t available = c.size() - offset.value_or(0);
+        size_t to_copy = (count && *count > 0 ? *count : available) * sizeof(typename std::remove_cvref_t<C>::value_type);
+        return std::span<Elem>(reinterpret_cast<Elem*>(c.data() + offset.value_or(0)), to_copy);
+    }
+    
+    /**
+     * @brief Cria um `std::span<std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
+     * @param o O objeto.
+     * @param size (Opcional) O tamanho da estrutura (Estruturas como o grupo de descritores podem ter mais de um tamanho a depender da arquitetura 32 ou 64 bits por exemplo).
+     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
+     */
+    template <Object O> requires (!Container<O>)
+    inline constexpr auto as_byte_span(O &&o, const std::optional<size_t> size = std::nullopt) {
+        using Elem = std::conditional_t<std::is_const_v<std::remove_reference_t<O>>, const std::byte, std::byte>;
+        return std::span<Elem>(reinterpret_cast<Elem*>(&o), size.value_or(sizeof(O)));
     }
 
     /**
-     * @brief Cria um `std::span<const T>` a partir de um container const,
-     * preservando o tipo do elemento sem conversão para bytes.
+     * @brief Cria um `std::span<T>` a partir de um container.
+     * @param c O container.
+     * @param offset (opcional) O offset (em elementos) para começar a ler do container.
+     * @param count (opcional) Quantos elementos deverão ser incluidos no `std::span`.
      */
-    template <Container C>
-    inline constexpr auto as_span(const C &c) {
-        using ValueType = typename std::remove_cvref_t<C>::value_type;
-        return std::span<const ValueType>(c.data(), c.size());
+    template <typename T, Container C>
+    inline constexpr auto as_span(C &&c, const std::optional<size_t> offset = std::nullopt, const std::optional<size_t> count = std::nullopt) {
+        using Elem = std::conditional_t<std::is_const_v<std::remove_reference_t<C>>, const T, T>;
+        size_t available = c.size() - offset.value_or(0);
+        size_t to_copy = (count && *count > 0 ? *count : available) * sizeof(typename std::remove_cvref_t<C>::value_type) / sizeof(T);
+        return std::span<Elem>(reinterpret_cast<Elem*>(c.data() + offset.value_or(0)), to_copy);
     }
 
     /**
-     * @brief Interpreta bytes de um span a partir de um offset como um span de T.
-     * Útil para percorrer estruturas sequenciais em buffers binários.
+     * @brief Cria um `std::span<T>` a partir de um objeto.
+     * @param o O objeto.
+     * @param size (Opcional) O tamanho real da estrutura em bytes (útil quando a estrutura
+     *             pode ter tamanho variável, como inodes com tamanho menor que o alocado).
      */
-    template <typename T, std::integral Count>
-    inline constexpr std::span<const T> as_span_offset(std::span<const std::byte> src, size_t offset, Count count) {
-        return std::span<const T>(
-            reinterpret_cast<const T*>(src.data() + offset),
-            static_cast<size_t>(count)
-        );
+    template <typename T, typename O> requires (!Container<O>)
+    inline constexpr auto as_span(O &&o, const std::optional<size_t> size = std::nullopt) {
+        using Elem = std::conditional_t<std::is_const_v<std::remove_reference_t<O>>, const T, T>;
+        const std::size_t to_copy = size.value_or(sizeof(O)) / sizeof(T);
+        return std::span<Elem>(reinterpret_cast<Elem*>(&o), to_copy);
     }
 
     /**
@@ -200,44 +145,6 @@ namespace Utils {
     template <std::integral T>
     inline constexpr T to_4bit_aligned(const T &to_align) {
         return (to_align + 3) & ~3;
-    }
-
-    /**
-     * @brief Cria um `std::span<std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
-     * @param c O objeto.
-     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
-     */
-    inline constexpr auto as_byte_span(Object auto &o) {
-        return std::span(reinterpret_cast<std::byte*>(&o), sizeof(o));
-    }
-
-    /**
-     * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
-     * @param c O objeto.
-     * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
-     */
-    inline constexpr auto as_byte_span(const Object auto &o) {
-        return std::span(reinterpret_cast<const std::byte*>(&o), sizeof(o));
-    }
-
-    /**
-     * @brief Cria um `std::span<std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
-     * @param c O objeto.
-     * @param range O tamanho da estrutura (Estruturas como o grupo de descritores podem ter mais de um tamanho a depender da arquitetura 32 ou 64 bits por exemplo).
-     * @returns Um `std::span<std::byte>` que abrange os dados especificados.
-     */
-    inline constexpr auto as_byte_span(Object auto &o, const size_t range) {
-        return std::span(reinterpret_cast<std::byte*>(&o), range);
-    }
-
-    /**
-     * @brief Cria um `std::span<const std::byte>` a partir de uma referência para um objeto, garantindo que o tipo seja tratado como bytes.
-     * @param c O objeto.
-     * @param range O tamanho da estrutura (Estruturas como o grupo de descritores podem ter mais de um tamanho a depender da arquitetura 32 ou 64 bits por exemplo).
-     * @returns Um `std::span<const std::byte>` que abrange os dados especificados.
-     */
-    inline constexpr auto as_byte_span(const Object auto &o, const size_t range) {
-        return std::span(reinterpret_cast<const std::byte*>(&o), range);
     }
 
     /**

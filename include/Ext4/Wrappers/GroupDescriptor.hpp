@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Raw/GroupDescriptor.hpp"
+#include "../../Utils.hpp"
 #include <cstdint>
 
 namespace Ext4::Wrappers {
@@ -18,6 +19,13 @@ namespace Ext4::Wrappers {
          */
         uint16_t get_desc_size() const {
             return this->_desc_size;
+        }
+
+        /**
+         * @brief Retorna o checksum dos metadados gravados (caso tenha)
+         */
+        uint16_t get_checksum() const {
+            return this->raw.bg_checksum;
         }
 
         /**
