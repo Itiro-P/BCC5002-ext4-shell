@@ -7,7 +7,7 @@
 using Ext4::Wrappers::Image;
 
 short Command::help() {
-    for(const auto &[cmd, desc] : Command::command_info) {
+    for (const auto &[cmd, desc] : Command::command_info) {
         std::println("- {:<32} - {}", cmd, desc);
     }
     return 0;
@@ -33,7 +33,7 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
     // Cria a view filtrada para ver se há um arquivo aqui.
-    auto target_file = std::ranges::find_if(entries, [&](const auto &entry) {
+    auto target_file = std::ranges::find_if (entries, [&](const auto &entry) {
         return entry.get_name() == file_name;
     });
 
@@ -44,7 +44,7 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
     }
 
     // Se for um diretório, saímos
-    if(target_file->is_dir()) {
+    if (target_file->is_dir()) {
         std::println(std::cerr, "Erro: Arquivo '{}' na verdade é um diretório.", file_name);
         return 1;
     }
@@ -84,7 +84,7 @@ short Command::cd(Image &img, const std::vector<std::string> &args) {
     auto [parent_dir, resolved_path] = img.resolve_path(target_path, img.get_current_inode());
 
     // Checamos se não chegamos no memso diretório
-    if(img.get_current_path().ends_with(resolved_path)) {
+    if (img.get_current_path().ends_with(resolved_path)) {
         std::println("Diretório alvo é o mesmo do atual.");
         return 1;
     }
@@ -100,7 +100,7 @@ short Command::ls(Image &img, const std::vector<std::string> &args) {
     const std::string target_path = args.size() > 1 ? args[1] : img.get_current_path();
     auto [parent_dir, _] = img.resolve_path(target_path, img.get_current_inode());
 
-    for(const auto &entry: img.list_dir(parent_dir)) {
+    for (const auto &entry: img.list_dir(parent_dir)) {
         bool is_dir = entry.is_dir();
         std::println("{}{}{}", is_dir ? "\033[32m" : "", entry.get_name(), is_dir ? "\033[0m" : "");
     }
@@ -216,6 +216,7 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
         .i_links_count = 1,
         .i_flags     = Flags::InodeFlags::EXT4_EXTENTS_FL,  // EXT4_EXTENTS_FL
         .i_size_hi   = 0,
+        .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize,
 
     };
 
@@ -230,13 +231,19 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
   
     // Finalmente escrevemos na imagem
     Utils::write_to(new_inode.i_block, eh);
-    img.write_inode(new_inode_id, new_inode);
+    img.write_inode(Wrappers::Inode(
+        new_inode_id, 
+        img.get_volume_uuid(), 
+        img.get_superblock().get_inode_size(),
+        new_inode, 
+        std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0})));
+
     img.dir_add_entry(parent_dir, new_inode_id, file_name, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
 
     // Modificamos o inode pai para modificar os campos "modificado"
     Raw::Inode parent_raw = parent_dir.get_raw();
     parent_raw.i_mtime = now;
-    img.write_inode(parent_dir.get_inode_id(), parent_raw);
+    img.write_inode(parent_dir);
     return 0;
 }
 
@@ -257,7 +264,7 @@ short Command::mkdir(Image &img, const std::vector<std::string> &args) {
         return entry.get_name() == path_name;
     });
 
-    if(path_exists) {
+    if (path_exists) {
         std::println("Diretório alvo existe e é um arquivo/diretório");
         return 1;
     }
@@ -280,7 +287,7 @@ short Command::rm(Image &img, const std::vector<std::string> &args) {
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
     // Vemos se o arquivo não existe mais
-    auto target = std::ranges::find_if(entries, [&](const auto &e) {
+    auto target = std::ranges::find_if (entries, [&](const auto &e) {
         return e.get_name() == file_name;
     });
 

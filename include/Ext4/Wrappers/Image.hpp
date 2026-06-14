@@ -46,6 +46,13 @@ namespace Ext4::Wrappers {
          */
         explicit Image(const std::string &image_path);
 
+        /**
+         * @brief Retorna o superbloco
+         */
+        Wrappers::SuperBlock get_superblock() const {
+            return this->super_block;
+        }
+
         // Desabilita a cópia para evitar problemas de gerenciamento de recursos.
         Image(const Image&) = delete;
         Image &operator=(const Image&) = delete;
@@ -124,7 +131,7 @@ namespace Ext4::Wrappers {
          * @param str o caminho.
          */
         void set_current_path(const std::string &str) {
-            if(!str.empty()) this->current_path = str;
+            if (!str.empty()) this->current_path = str;
         }
 
         /**
@@ -133,6 +140,14 @@ namespace Ext4::Wrappers {
          */
         std::string get_current_path() const {
             return this->current_path;
+        }
+
+        std::string get_volume_uuid() const {
+            return this->super_block.get_uuid();
+        }
+
+        std::span<const std::byte> get_volume_uuid_bytes() const {
+            return this->super_block.get_uuid_bytes();
         }
 
         /**
@@ -151,14 +166,6 @@ namespace Ext4::Wrappers {
          * @returns O Inode relacionado ao diretório alvo.
          */
         std::pair<Wrappers::Inode, std::string> resolve_path(const std::string &path, const Wrappers::Inode &base);
-
-        /**
-         * @brief Lê os metadados de um inode específico do disco a partir do seu número global.
-         * @param inode_num Número do inode (ex: 2 para o diretório raiz).
-         * @returns Estrutura preenchida com os dados do disco Inode.
-         * @throws `std::runtime_error` se o Inode for inválido ou qualquer tipo de erro.
-         */
-        Raw::Inode get_raw_inode(const uint32_t inode_num);
 
         /**
          * @brief Lê os metadados de um inode específico do disco a partir do seu número global.
@@ -195,32 +202,31 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Lê os blocos de dados a partir de um nó interno de indexação da árvore de extents. Deve ser chamado apenas quando `eh_depth > 0`.
+         * @param inode O inode para cálculo do checksum.
          * @param node_data Os dados do nó de extents a ser lido.
          * @param header O cabeçalho do nó de extents, necessário para determinar quantas entradas de blocos existem.
          * @returns Um vetor de números de blocos físicos alocados para os dados indexados por este nó interno.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o nó estiver corrompido ou se houver um erro de leitura do dispositivo).
          */
-        std::vector<uint64_t> read_blocks_from_index(std::span<const std::byte> node_data, const Raw::ExtentHeader &header);
+        std::vector<uint64_t> read_blocks_from_index(const Wrappers::Inode &inode, std::span<const std::byte> node_data, const Raw::ExtentHeader &header);
 
         /**
          * @brief Escreve um inode no disco.
-         * @param inode_num O número do inode.
-         * @param inode A estrutura `inode`.
+         * @param inode O `inode`.
          */
-        void write_inode(const uint32_t inode_num, const Raw::Inode &inode);
+        void write_inode(const Wrappers::Inode &inode);
 
         /**
          * @brief Escreve um grupo de descritores no disco.
-         * @param inode_num O número do GroupDescriptor.
-         * @param gd A estrutura GroupDescriptor.
+         * @param gd O GroupDescriptor.
          */
-        void write_gdt(uint32_t group, const Raw::GroupDescriptor &gd);
+        void write_gdt(const Wrappers::GroupDescriptor &gd);
 
         /**
          * @brief Escreve um superbloco no disco.
-         * @param sp A estrutura SuperBlock.
+         * @param sb O SuperBlock.
          */
-        void write_superblock(const Raw::SuperBlock &sp);
+        void write_superblock(const Wrappers::SuperBlock &sb);
 
         /**
          * @brief Retorna o grupo de blocos que o inode pertence.

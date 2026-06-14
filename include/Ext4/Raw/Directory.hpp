@@ -16,7 +16,8 @@ namespace Ext4::Raw {
         EXT4_FT_BLKDEV   = 4, // Dispositivo de blocos (Block device).
         EXT4_FT_FIFO     = 5, // Fila FIFO / Pipe nomeado.
         EXT4_FT_SOCK     = 6, // Socket Unix.
-        EXT4_FT_SYMLINK  = 7  // Ligação simbólica (Symbolic link).
+        EXT4_FT_SYMLINK  = 7,  // Ligação simbólica (Symbolic link).
+        EXT4_FT_DIR_CSUM = 0xDE  // Entrada falsa de tail de checksum
     };
 
     #pragma pack(push, 1)
@@ -31,6 +32,19 @@ namespace Ext4::Raw {
         uint8_t  name_len;     // Tamanho real (em bytes) da string correspondente ao nome do ficheiro.
         uint8_t  file_type;    // Tipo do ficheiro mapeado (Ver mapeamento em DirectoryFileType).
         // O nome do arquivo segue em linha na memória: char name[name_len]
+    };
+    #pragma pack(pop)
+
+    #pragma pack(push, 1)
+    /**
+     * @brief Cauda presente de forma oculta que armazena o checksum do diretório.
+     */
+    struct DirectoryEntryTail {
+        uint32_t det_reserved_zero1;  // Sempre 0 (para parecer um inode inválido)
+        uint16_t det_rec_len;         // Tamanho deste registro (sempre 12)
+        uint8_t  det_reserved_zero2;  // Sempre 0
+        uint8_t  det_reserved_ft;     // Tipo de arquivo especial (0xDE - EXT4_FT_DIR_CSUM)
+        uint32_t det_checksum;        // O CHECKSUM REAL (CRC32c) de 32 bits
     };
     #pragma pack(pop)
 
@@ -73,6 +87,7 @@ namespace Ext4::Raw {
 
     // Asserções estáticas para assegurar conformidade milimétrica com o layout do Kernel Linux
     static_assert(sizeof(DirectoryEntry) == 8, "A estrutura base DirectoryEntry deve medir exatamente 8 bytes!");
+    static_assert(sizeof(DirectoryEntryTail) == 12, "DirectoryEntryTail deve ter exatamente 12 bytes!");
     static_assert(sizeof(DxRootInfo)     == 8, "A estrutura DxRootInfo deve medir exatamente 8 bytes!");
     static_assert(sizeof(DxEntry)        == 8, "A estrutura DxEntry deve medir exatamente 8 bytes!");
     static_assert(sizeof(DxTail)         == 8, "A estrutura DxTail deve medir exatamente 8 bytes!");

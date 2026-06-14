@@ -53,7 +53,7 @@ class Shell {
      * @param exit_code O código de saída do comando anterior.
      */
     void print_prompt(const uint8_t exit_code) {
-        if(exit_code == 0) {
+        if (exit_code == 0) {
             std::print("{} - ({})> ", success_prefix, this->image.get_current_path());
         } else {
             std::print("{} - ({})> ", fail_prefix, this->image.get_current_path());

@@ -63,6 +63,11 @@ public:
     bool has_metadata_csum() const;
 
     /**
+     * @brief Indica se checksums de descritores de grupo estão ativos (`RO_COMPAT_GDT_CSUM`).
+     */
+    bool has_compat_gdt_csum() const;
+
+    /**
      * @brief Total de inodes no filesystem.
      * Usado para validar números de inode em get_raw_inode().
      */
@@ -94,7 +99,7 @@ public:
 
     /**
      * @brief Tamanho do bloco em bytes: 1024 << s_log_block_size.
-     * Valores possíveis: 1024, 2048, 4096. Usado em todo cálculo de offset.
+     * Valores possíveis: 1024, 2048, 409Usado em todo cálculo de offset.
      */
     uint32_t get_block_size() const;
 
@@ -109,6 +114,11 @@ public:
      * Usado para calcular em qual grupo um inode reside: (ino-1) / inodes_per_group.
      */
     uint32_t get_inodes_per_group() const;
+
+    /**
+     * @brief Número de clusters contidos em cada Grupo de Blocos.
+     */
+    uint32_t get_clusters_per_group() const;
 
     /**
      * @brief Tamanho de cada inode no disco em bytes (tipicamente 128 ou 256).
@@ -165,6 +175,21 @@ public:
      * Exibido em `info`.
      */
     std::string get_uuid() const;
+
+    /**
+     * @brief UUID do filesystem como bytes.
+     */
+    std::span<const std::byte> get_uuid_bytes() const;
+
+    /**
+     * @brief Retorna a semente pré-gerada para cálculo dos checksums (normalmente UUID)
+     */
+    uint32_t get_checksum_seed() const;
+
+    /**
+     * @brief Verifica se o superbloco tem uma semente pré-gerada.
+     */
+    bool has_checksum_seed() const;
 
     /**
      * @brief Timestamp Unix da criação do filesystem (mkfs).

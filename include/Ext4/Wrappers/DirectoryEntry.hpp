@@ -75,7 +75,7 @@ namespace Ext4::Wrappers {
          * @brief Retorna o tamanho que foi alocado para essa entrada. Esse número costuma sobrar quando a entrada é a última no bloco.
          */
         uint32_t get_allocated_size() const {
-            return static_cast<uint32_t>(this->get_raw().rec_len);
+            return static_cast<uint32_t>(this->raw.rec_len);
         }
 
         /**

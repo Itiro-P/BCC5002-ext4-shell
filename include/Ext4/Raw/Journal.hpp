@@ -48,7 +48,7 @@ namespace Ext4::Raw {
         uint32_t                 j_feature_ro_compat;  // Flags de recursos somente leitura tolerados pelo motor.
 
         //  Identidade e Integração (0x30) 
-        std::array<uint8_t, 16>  j_uuid;               // Identificador Único Universal (UUID) da própria instância do Journal.
+        std::array<uint8_t>  j_uuid;               // Identificador Único Universal (UUID) da própria instância do Journal.
         uint32_t                 j_nr_users;           // Quantidade de sistemas de ficheiros que partilham este journal (Geralmente 1).
         uint32_t                 j_dynpad;             // Alinhamento dinâmico de blocos de disco adicionais.
 
