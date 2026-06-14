@@ -45,14 +45,12 @@ Wrappers::Image::Image(const std::string &image_path) {
         this->read_offset(offset, Utils::as_byte_span(gd, desc_size));
 
         Wrappers::GroupDescriptor gdt = Wrappers::GroupDescriptor(gd, i, desc_size, is_64);
-        uint16_t rec_check = gdt.get_checksum();
-        uint16_t calc_check = Checksums::checksum_group(gdt, this->super_block.has_metadata_csum(), this->super_block.get_checksum_seed());
-        if (rec_check != calc_check) {
-            throw std::runtime_error(
-                std::format(
-                    "Erro: Checksum do grupo de descritores {} é diferente do esperado.\nGravado: 0x{:08x}; Esperado: 0x{:08x}; Iguais? {}", 
-                    i, rec_check, calc_check, rec_check == calc_check));
-        }
+
+        // Checagem de checksums
+        if(uint16_t rec = gdt.get_checksum(), 
+            calc = Checksums::checksum_group(gdt, this->super_block.has_metadata_csum(), this->super_block.get_checksum_seed()); 
+            rec != calc) throw std::logic_error(std::format("Checksum do grupo de descritores {} é diferente do esperado.\nGravado: 0x{:08x}; Esperado: 0x{:08x}", 
+                i, rec, calc));
 
         this->group_descriptors.push_back(gdt);
     }
@@ -135,7 +133,7 @@ uint32_t Ext4::Wrappers::Image::get_block_bit_pos(const uint32_t blk) {
 std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num) {
     // Validação preventiva: Inodes no EXT4 começam obrigatoriamente no índice 1
     if (inode_num == 0 || inode_num > this->super_block.get_inodes_count()) {
-        throw std::runtime_error(std::format("Erro: Número de inode inválido ou fora dos limites: {}", inode_num));
+        throw std::logic_error(std::format("Erro: Número de inode inválido ou fora dos limites: {}", inode_num));
     }
 
     // Descobrir a qual Block Group este inode pertence
@@ -169,12 +167,10 @@ Wrappers::Inode Wrappers::Image::get_inode(const uint32_t inode_num) {
     // Checagem de checksums
     if (this->super_block.has_metadata_csum()) {
         Wrappers::Inode wrapper = Wrappers::Inode(inode_num, this->get_volume_uuid(), this->super_block.get_inode_size(), inode, excess_bytes);
-        uint32_t rec = wrapper.get_checksum();
-        uint32_t calc = Checksums::checksum_inode(wrapper, this->super_block.get_checksum_seed());
-        if (rec != calc) {
-            std::println("Checksum do inode {} não condiz com o checksum calculado", inode_num);
-            std::println("Calculado: 0x{:08x}; Gravado: 0x{:08x}", calc, rec);
-        }
+        if (uint32_t rec = wrapper.get_checksum(),
+            calc = Checksums::checksum_inode(wrapper, this->super_block.get_checksum_seed());
+            rec != calc) throw std::logic_error(std::format("Checksum do inode {} não condiz com o checksum calculado.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}", 
+                inode_num, calc, rec));
     }
 
     Wrappers::Inode wrapper = Wrappers::Inode(inode_num, this->get_volume_uuid(), this->super_block.get_inode_size(), inode, excess_bytes);
@@ -237,17 +233,16 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(const Wrappers::In
         }
     }
 
+    // Checagem de checkums
     if (this->super_block.has_metadata_csum()) {
-        uint32_t calc = Checksums::checksum_extent(inode, Utils::as_byte_span(blocks), sizeof(blocks), this->super_block.get_checksum_seed());
-        // rec vem do ExtentTail no final do i_block
-        Raw::ExtentTail tail = Utils::copy<Raw::ExtentTail>(
-            Utils::as_span<std::byte>(blocks, sizeof(blocks) - sizeof(Raw::ExtentTail))
-        );
-        if (tail.eb_checksum != calc) {
-            std::println("Checksum do extent {} não condiz com o checksum calculado", inode.get_inode_id());
-            std::println("Calculado: 0x{:08x}; Gravado: 0x{:08x}", calc, tail.eb_checksum);
-        }
+        Raw::ExtentTail tail = Utils::copy<Raw::ExtentTail>(Utils::as_span<std::byte>(buffer, buffer.size() - sizeof(Raw::ExtentTail)));
+        if (uint32_t calc = Checksums::checksum_extent(inode, Utils::as_byte_span(buffer), buffer.size(), this->super_block.get_checksum_seed()); 
+            tail.eb_checksum != calc)
+            throw std::logic_error(std::format(
+                "Checksum do extent {} inválido.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}",
+                inode.get_inode_id(), calc, tail.eb_checksum));
     }
+
     return blocks; // Retorno por valor (Move semantics do C++ garante que é eficiente e seguro)
 }
 
@@ -353,18 +348,14 @@ std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::
     // Checagem de checksums
     if (this->super_block.has_metadata_csum()) {
         uint32_t block_size = this->super_block.get_block_size();
-        Raw::DirectoryEntryTail tail = Utils::copy<Raw::DirectoryEntryTail>(
-            Utils::as_span<std::byte>(bytes, block_size - sizeof(Raw::DirectoryEntryTail))
-        );
+        Raw::DirectoryEntryTail tail = Utils::copy<Raw::DirectoryEntryTail>(Utils::as_span<std::byte>(bytes, block_size - sizeof(Raw::DirectoryEntryTail)));
         // Vemos se a saída é realmente a cauda de checksum
         if ((tail.det_reserved_zero1 + tail.det_reserved_zero2) == 0 &&
-            tail.det_rec_len == 12 && tail.det_reserved_ft == Raw::DirectoryFileType::EXT4_FT_DIR_CSUM
-        ) {
-            uint32_t calc = Checksums::checksum_dir(inode, Utils::as_span<std::byte>(bytes), block_size, this->super_block.get_checksum_seed());
-            if (tail.det_checksum != calc) {
-                std::println("Checksum da entrada do diretório não condiz com o checksum calculado");
-                std::println("Calculado: 0x{:08x}; Gravado: 0x{:08x}", calc, tail.det_checksum);
-            }
+            tail.det_rec_len == 12 && tail.det_reserved_ft == Raw::DirectoryFileType::EXT4_FT_DIR_CSUM) {
+            if (uint32_t calc = Checksums::checksum_dir(inode, Utils::as_span<std::byte>(bytes), block_size, this->super_block.get_checksum_seed());
+            tail.det_checksum != calc)
+            throw std::logic_error(std::format(
+                "Checksum da entrada do diretório inválido.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}", calc, tail.det_checksum));
         } else {
             // Provavelmente o disco está corrompido.
             throw std::runtime_error("A flag de checksum de metadados está ativada, mas a cauda da lista de diretórios não é válida...\n");
@@ -389,21 +380,47 @@ std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::
     return entries;
 }
 
-void Ext4::Wrappers::Image::write_inode(const uint32_t inode_num, const Raw::Inode &inode) {
-    std::streamoff offset = this->get_inode_offset(inode_num);
-    this->write_offset(offset, Utils::as_byte_span(inode));
+void Ext4::Wrappers::Image::write_inode(const Wrappers::Inode &inode) {
+    std::streamoff offset = this->get_inode_offset(inode.get_inode_id());
+
+    // Cálculo do checksum para gravação
+    if (this->super_block.has_metadata_csum()) {
+        uint32_t check = Checksums::checksum_inode(inode, this->super_block.get_checksum_seed());
+        Raw::Inode new_raw = inode.get_raw();
+        Utils::split(check, new_raw.i_osd2.l_i_checksum_lo, new_raw.i_checksum_hi);
+        this->write_offset(offset, Utils::as_byte_span(new_raw));
+        return;    
+    }
+    this->write_offset(offset, Utils::as_byte_span(inode.get_raw()));
 }
 
-void Ext4::Wrappers::Image::write_gdt(uint32_t group, const Raw::GroupDescriptor &gd) {
+void Ext4::Wrappers::Image::write_gdt(const Wrappers::GroupDescriptor &gd) {
     uint16_t desc_size = this->super_block.get_desc_size();
-    std::streamoff offset = this->super_block.get_gdt_offset() + (static_cast<uint64_t>(group) * desc_size);
-    this->write_offset(offset, Utils::as_byte_span(gd, desc_size));
-    this->group_descriptors[group] = Wrappers::GroupDescriptor(gd, group, desc_size, this->super_block.is_64bit());
+    std::streamoff offset = this->super_block.get_gdt_offset() + (static_cast<uint64_t>(gd.get_group_number()) * desc_size);
+    
+    // Cálculo do checksum para gravação
+    // Grupos de descritores contém CRC16 caso a flag de checksum de metadados esteja desativada.
+    Wrappers::GroupDescriptor copy = gd;
+    uint16_t check = Checksums::checksum_group(copy, this->super_block.has_metadata_csum(), this->super_block.get_checksum_seed());
+    Raw::GroupDescriptor new_raw = copy.get_raw();
+    new_raw.bg_checksum = check;
+    copy.set_raw(new_raw);
+    this->write_offset(offset, Utils::as_byte_span(new_raw, desc_size));
+    this->group_descriptors[copy.get_group_number()] = copy;
 }
 
-void Ext4::Wrappers::Image::write_superblock(const Raw::SuperBlock &sp) {
-    this->write_offset(Constants::SUPERBLOCK_OFFSET, Utils::as_byte_span(sp));
-    this->super_block = Wrappers::SuperBlock(sp);
+void Ext4::Wrappers::Image::write_superblock(const Wrappers::SuperBlock &sb) {
+    // Cálculo de checksums
+    if(sb.has_metadata_csum()) {
+        Raw::SuperBlock sb_raw = sb.get_raw();
+        sb_raw.s_checksum = Checksums::checksum_super_block(sb);
+        Wrappers::SuperBlock new_sp = Wrappers::SuperBlock(sb_raw);
+        this->super_block = new_sp;
+        this->write_offset(Constants::SUPERBLOCK_OFFSET, Utils::as_byte_span(sb_raw));
+        return;
+    }
+    this->super_block = sb;
+    this->write_offset(Constants::SUPERBLOCK_OFFSET, Utils::as_byte_span(sb.get_raw()));
 }
 
 uint64_t Ext4::Wrappers::Image::get_absolute_block_offset(const Wrappers::Inode &inode, const uint32_t relative_offset) {
@@ -425,6 +442,9 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
 
     size_t gd_id = 0, bit_pos = 0;
 
+    // Possível novo checksum do bitmap
+    uint32_t new_bitmap_csum = 0;
+
     for (size_t i = 0; i < gds.size(); i++) {
         if (stop) break;
 
@@ -435,12 +455,9 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
         auto bitmap_span = full_span.subspan(0, this->super_block.get_inodes_per_group() / 8);
         // Checagem de checksums
         if (this->super_block.has_metadata_csum()) {
-            uint32_t rec = gds[i].get_inode_bitmap_checksum();
-            uint32_t calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
-            if (rec != calc) {
-                std::println("Checksum para o bitmap de inodes do GDT {} inválido.", i);
-                std::println("Calculado: 0x{:08x}; Gravado: 0x{:08x}.", calc, rec);
-            }
+            if (uint32_t rec = gds[i].get_inode_bitmap_checksum(), calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()); 
+                rec != calc) throw std::logic_error(std::format("Checksum para o bitmap de inodes do GDT {} inválido.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}.", 
+                    i, calc, rec));
         }
 
         for (size_t j = 0; j < bitmap_span.size() * 8; ++j) {
@@ -450,6 +467,10 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
                 gd_id = i;
                 bit_pos = j;
                 this->write_block(gds[gd_id].get_inode_bitmap_block(), full_span);
+
+                if (this->super_block.has_metadata_csum())
+                    new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
+
                 stop = true;
                 break;
             }
@@ -460,16 +481,18 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
 
     Wrappers::GroupDescriptor to_change = gds[gd_id];
     Raw::GroupDescriptor new_raw = to_change.get_raw();
+    if (this->super_block.has_metadata_csum())
+        Utils::split(new_bitmap_csum, new_raw.bg_inode_bitmap_csum_lo, new_raw.bg_inode_bitmap_csum_hi);
     
     uint32_t new_inode_count = to_change.get_free_inodes_count() -1;
     Utils::split(new_inode_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
-
+    
     to_change.set_raw(new_raw);
-    this->write_gdt(gd_id, new_raw);
+    this->write_gdt(to_change);
 
     Raw::SuperBlock sb_raw = this->super_block.get_raw();
     sb_raw.s_free_inodes_count--;
-    this->write_superblock(sb_raw);
+    this->write_superblock(Wrappers::SuperBlock(sb_raw));
 
     return gd_id * this->super_block.get_inodes_per_group() + bit_pos + 1;
 }
@@ -480,6 +503,9 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
 
     uint32_t gd_id = 0, bit_pos = 0;
 
+    // Possível novo checksum de bitmap
+    uint32_t new_bitmap_csum = 0;
+
     for (size_t i = 0; i < gds.size(); i++) {
         if (stop) break;
 
@@ -488,14 +514,12 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
         this->read_block(gds[i].get_block_bitmap_block(), full_span);
 
         auto bitmap_span = full_span.subspan(0, this->super_block.get_blocks_per_group() / 8);
+
         // Checagem de checksums
         if (this->super_block.has_metadata_csum()) {
-            uint32_t rec = gds[i].get_block_bitmap_checksum();
-            uint32_t calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
-            if (rec != calc) {
-                std::println("Checksum para o bitmap de blocos do GDT {} inválido.", i);
-                std::println("Calculado: {}; Gravado: {}.", rec, calc);
-            }
+            if (uint32_t rec = gds[i].get_block_bitmap_checksum(), calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()); 
+                rec != calc) throw std::logic_error(std::format("Checksum para o bitmap de blocos do GDT {} inválido.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}.", 
+                    i, calc, rec));
         }
 
         for (size_t j = 0; j < bitmap_span.size() * 8; ++j) {
@@ -505,6 +529,10 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
                 gd_id = i;
                 bit_pos = j;
                 this->write_block(gds[gd_id].get_block_bitmap_block(), full_span);
+
+                if (this->super_block.has_metadata_csum())
+                    new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
+
                 stop = true;
                 break;
             }
@@ -515,18 +543,20 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
 
     Wrappers::GroupDescriptor to_change = gds[gd_id];
     Raw::GroupDescriptor new_raw = to_change.get_raw();
+    if (this->super_block.has_metadata_csum())
+        Utils::split(new_bitmap_csum, new_raw.bg_block_bitmap_csum_lo, new_raw.bg_block_bitmap_csum_hi);
 
     uint32_t new_block_count = to_change.get_free_blocks_count() -1;
     Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
 
     to_change.set_raw(new_raw);
-    this->write_gdt(gd_id, new_raw);
+    this->write_gdt(to_change);
 
     Raw::SuperBlock sb_raw = this->super_block.get_raw();
     uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
     global_free_blocks--;
     Utils::split(global_free_blocks, sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
-    this->write_superblock(sb_raw);
+    this->write_superblock(Wrappers::SuperBlock(sb_raw));
 
     return gd_id * this->super_block.get_blocks_per_group() + bit_pos;
 }
@@ -534,6 +564,8 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
 void Ext4::Wrappers::Image::free_inode(const uint32_t ino) {
     uint32_t group = this->get_inode_group(ino);
     uint32_t bit_pos = this->get_inode_bit_pos(ino);
+    // Possível novo checksum de bitmap
+    uint32_t new_bitmap_csum = 0;
 
     Wrappers::GroupDescriptor &gd = this->group_descriptors[group];
     std::vector<std::byte> inode_bitmap(this->super_block.get_block_size());
@@ -543,36 +575,40 @@ void Ext4::Wrappers::Image::free_inode(const uint32_t ino) {
     auto bitmap_span = full_span.subspan(0, this->super_block.get_inodes_per_group() / 8);
     // Checagem de checksums
     if (this->super_block.has_metadata_csum()) {
-        uint32_t rec = gd.get_inode_bitmap_checksum();
-        uint32_t calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
-        if (rec != calc) {
-            std::println("Checksum para o bitmap de inodes do GDT {} inválido.", group);
-            std::println("Calculado: {}; Gravado: {}.", rec, calc);
-        }
+        if (uint32_t rec = gd.get_inode_bitmap_checksum(), calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()); 
+            rec != calc) throw std::logic_error(std::format("Checksum para o bitmap de inodes do GDT inválido.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}.", 
+                calc, rec));
     }
 
     if (Utils::test_bit(bitmap_span, bit_pos)) {
         Utils::set_bit(bitmap_span, bit_pos, 0);
         this->write_block(gd.get_inode_bitmap_block(), full_span);
+
+        if (this->super_block.has_metadata_csum()) 
+            new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
     } else return;
 
     Wrappers::GroupDescriptor to_change = gd;
     Raw::GroupDescriptor new_raw = to_change.get_raw();
+    if (this->super_block.has_metadata_csum())
+        Utils::split(new_bitmap_csum, new_raw.bg_inode_bitmap_csum_lo, new_raw.bg_inode_bitmap_csum_hi);
     
     uint32_t new_inodes_count = to_change.get_free_inodes_count() +1;
     Utils::split(new_inodes_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
 
     to_change.set_raw(new_raw);
-    this->write_gdt(group, new_raw);
+    this->write_gdt(to_change);
 
     Raw::SuperBlock sb_raw = this->super_block.get_raw();
     sb_raw.s_free_inodes_count++;
-    this->write_superblock(sb_raw);
+    this->write_superblock(Wrappers::SuperBlock(sb_raw));
 }
 
 void Ext4::Wrappers::Image::free_block(const uint32_t blk) {
     uint32_t group = this->get_block_group(blk);
     uint32_t bit_pos = this->get_block_bit_pos(blk);
+    // Possível novo checksum de bitmap
+    uint32_t new_bitmap_csum = 0;
 
     Wrappers::GroupDescriptor &gd = this->group_descriptors[group];
     std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
@@ -582,33 +618,35 @@ void Ext4::Wrappers::Image::free_block(const uint32_t blk) {
     auto bitmap_span = full_span.subspan(0, this->super_block.get_blocks_per_group() / 8);
     // Checagem de checksums
     if (this->super_block.has_metadata_csum()) {
-        uint32_t rec = gd.get_block_bitmap_checksum();
-        uint32_t calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
-        if (rec != calc) {
-            std::println("Checksum para o bitmap de blocos do GDT {} inválido.", group);
-            std::println("Calculado: {}; Gravado: {}.", rec, calc);
-        }
+        if (uint32_t rec = gd.get_block_bitmap_checksum(), calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()); 
+            rec != calc) throw std::logic_error(std::format("Checksum para o bitmap de blocos do GDT inválido.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}.", 
+                calc, rec));
     }
 
     if (Utils::test_bit(bitmap_span, bit_pos)) {
         Utils::set_bit(bitmap_span, bit_pos, 0);
         this->write_block(gd.get_block_bitmap_block(), full_span);
+
+        if (this->super_block.has_metadata_csum()) 
+            new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
     } else return;
 
     Wrappers::GroupDescriptor to_change = gd;
     Raw::GroupDescriptor new_raw = to_change.get_raw();
-    
+    if (this->super_block.has_metadata_csum())
+        Utils::split(new_bitmap_csum, new_raw.bg_block_bitmap_csum_lo, new_raw.bg_block_bitmap_csum_hi);
+
     uint32_t new_block_count = to_change.get_free_blocks_count() +1;
     Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
 
     to_change.set_raw(new_raw);
-    this->write_gdt(group, new_raw);
+    this->write_gdt(to_change);
 
     Raw::SuperBlock sb_raw = this->super_block.get_raw();
     uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
     global_free_blocks++;
     Utils::split(global_free_blocks, sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
-    this->write_superblock(sb_raw);
+    this->write_superblock(Wrappers::SuperBlock(sb_raw));
 }
 
 uint64_t Ext4::Wrappers::Image::entry_logical_offset(std::span<const Wrappers::DirectoryEntry> entries, size_t idx) const {
@@ -663,6 +701,26 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
     
     // Grava a string do nome logo após o cabeçalho dela (avançando os 8 bytes da struct)
     this->write_offset(new_entry_phys_offset + sizeof(Raw::DirectoryEntry), Utils::as_byte_span(name));
+
+    // Cálculo do checksum para gravação
+    uint32_t block_size = this->super_block.get_block_size();
+    uint64_t block_phys_base = (last_entry_phys_offset / block_size) * block_size;
+    uint64_t block_number = block_phys_base / block_size;
+    uint64_t block_phys_offset =  block_number * block_size;
+    uint64_t tail_phys_offset = block_phys_offset + block_size - sizeof(Raw::DirectoryEntryTail);
+
+    // Reler o bloco após as modificações para calcular checksum correto
+    std::vector<std::byte> updated_block(block_size);
+    this->read_block(block_number, Utils::as_byte_span(updated_block));
+
+    Raw::DirectoryEntryTail new_tail{
+        .det_reserved_zero1 = 0,
+        .det_rec_len = 12,
+        .det_reserved_zero2 = 0,
+        .det_reserved_ft = Raw::DirectoryFileType::EXT4_FT_DIR_CSUM,
+        .det_checksum = Checksums::checksum_dir(dir_inode, Utils::as_span<std::byte>(updated_block), block_size, this->super_block.get_checksum_seed()),
+    };
+    this->write_offset(tail_phys_offset, Utils::as_byte_span(new_tail));
 }
 
 void Ext4::Wrappers::Image::dir_unlink_entry(const Wrappers::Inode &dir_inode, const std::string &name) {
@@ -676,6 +734,27 @@ void Ext4::Wrappers::Image::dir_unlink_entry(const Wrappers::Inode &dir_inode, c
             this->get_absolute_block_offset(dir_inode, 0),
             Utils::as_byte_span(first_raw)
         );
+
+        // Cálculo do checksum para gravação
+        uint32_t block_size = this->super_block.get_block_size();
+        uint64_t first_phys_offset = this->get_absolute_block_offset(dir_inode, 0);
+        uint64_t block_phys_base = (first_phys_offset / block_size) * block_size;
+        uint64_t block_number = block_phys_base / block_size;
+        uint64_t block_phys_offset =  block_number * block_size;
+        uint64_t tail_phys_offset = block_phys_offset + block_size - sizeof(Raw::DirectoryEntryTail);
+
+        // Reler o bloco após as modificações para calcular checksum correto
+        std::vector<std::byte> updated_block(block_size);
+        this->read_block(block_number, Utils::as_byte_span(updated_block));
+
+        Raw::DirectoryEntryTail new_tail{
+            .det_reserved_zero1 = 0,
+            .det_rec_len = 12,
+            .det_reserved_zero2 = 0,
+            .det_reserved_ft = Raw::DirectoryFileType::EXT4_FT_DIR_CSUM,
+            .det_checksum = Checksums::checksum_dir(dir_inode, Utils::as_span<std::byte>(updated_block), block_size, this->super_block.get_checksum_seed()),
+        };
+        this->write_offset(tail_phys_offset, Utils::as_byte_span(new_tail));
         return;
     }
 
@@ -700,8 +779,31 @@ void Ext4::Wrappers::Image::dir_unlink_entry(const Wrappers::Inode &dir_inode, c
     uint64_t before_phys   = this->get_absolute_block_offset(dir_inode, before_offset);
 
     Raw::DirectoryEntry new_before = before_target.get_raw();
-    new_before.rec_len += target.get_raw().rec_len;
+      new_before.rec_len += target.get_raw().rec_len;
     this->write_offset(before_phys, Utils::as_byte_span(new_before));
+
+    // Cálculo do checksum para gravação
+    // Vamos descobrir onde a última entrada começa acumulando o rec_len de todas as anteriores
+    uint64_t last_entry_logical_offset = this->entry_logical_offset(Utils::as_span<const Ext4::Wrappers::DirectoryEntry>(entries), entries.size() - 1);
+    uint64_t last_entry_phys_offset = this->get_absolute_block_offset(dir_inode, last_entry_logical_offset);
+    uint32_t block_size = this->super_block.get_block_size();
+    uint64_t block_phys_base = (last_entry_phys_offset / block_size) * block_size;
+    uint64_t block_number = block_phys_base / block_size;
+    uint64_t block_phys_offset =  block_number * block_size;
+    uint64_t tail_phys_offset = block_phys_offset + block_size - sizeof(Raw::DirectoryEntryTail);
+
+    // Reler o bloco após as modificações para calcular checksum correto
+    std::vector<std::byte> updated_block(block_size);
+    this->read_block(block_number, Utils::as_byte_span(updated_block));
+
+    Raw::DirectoryEntryTail new_tail{
+        .det_reserved_zero1 = 0,
+        .det_rec_len = 12,
+        .det_reserved_zero2 = 0,
+        .det_reserved_ft = Raw::DirectoryFileType::EXT4_FT_DIR_CSUM,
+        .det_checksum = Checksums::checksum_dir(dir_inode, Utils::as_span<std::byte>(updated_block), block_size, this->super_block.get_checksum_seed()),
+    };
+    this->write_offset(tail_phys_offset, Utils::as_byte_span(new_tail));
 }
 
 void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, const std::string &name) {
@@ -720,8 +822,8 @@ void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, c
     // Remove só a DirEntry
     this->dir_unlink_entry(dir_inode, name);
 
-    // Lida com inode
-    Raw::Inode raw = this->get_inode(ino).get_raw();
+    Wrappers::Inode inode = this->get_inode(ino);
+    Raw::Inode raw = inode.get_raw();
     raw.i_links_count--;
 
     if (raw.i_links_count == 0) {
@@ -729,14 +831,17 @@ void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, c
         this->free_inode(ino);
         for (const auto &blk : blocks) this->free_block(blk);
     } else {
-        this->write_inode(ino, raw);
+        inode.set_raw(raw);
+        this->write_inode(inode);
     }
 
     // Se era diretório, decrementa link do pai
     if (file_type == Raw::DirectoryFileType::EXT4_FT_DIR) {
-        Raw::Inode raw_dir = dir_inode.get_raw();
+        Wrappers::Inode dir_copy = dir_inode;
+        Raw::Inode raw_dir = dir_copy.get_raw();
         raw_dir.i_links_count--;
-        this->write_inode(dir_inode.get_inode_id(), raw_dir);
+        dir_copy.set_raw(raw_dir);
+        this->write_inode(dir_copy);
     }
 }
 

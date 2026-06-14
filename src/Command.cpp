@@ -230,13 +230,19 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
   
     // Finalmente escrevemos na imagem
     Utils::write_to(new_inode.i_block, eh);
-    img.write_inode(new_inode_id, new_inode);
+    img.write_inode(Wrappers::Inode(
+        new_inode_id, 
+        img.get_volume_uuid(), 
+        img.get_superblock().get_inode_size(),
+        new_inode, 
+        std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0})));
+
     img.dir_add_entry(parent_dir, new_inode_id, file_name, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
 
     // Modificamos o inode pai para modificar os campos "modificado"
     Raw::Inode parent_raw = parent_dir.get_raw();
     parent_raw.i_mtime = now;
-    img.write_inode(parent_dir.get_inode_id(), parent_raw);
+    img.write_inode(parent_dir);
     return 0;
 }
 

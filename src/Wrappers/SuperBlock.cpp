@@ -18,14 +18,15 @@ Ext4::Raw::SuperBlock Ext4::Wrappers::SuperBlock::get_raw() const {
 
 void Ext4::Wrappers::SuperBlock::validate() const {
     if (this->raw.s_magic != Ext4::Constants::EXT_MAGIC) {
-        throw std::runtime_error("Erro: SuperBlock inválido - Assinatura mágica incorreta. O sistema de arquivos pode estar corrompido ou não ser um EXT4.");
+        throw std::logic_error("Erro: SuperBlock inválido - Assinatura mágica incorreta. O sistema de arquivos pode estar corrompido ou não ser um EXT4.");
     }
     // Se temos suporte a 64 bits, então temos checksum de metadados. Checando...
     if (this->_is_64 && this->has_metadata_csum()) {
         uint32_t checksum = Checksums::checksum_super_block(*this);
         if (this->get_raw().s_checksum != checksum) {
-            throw std::runtime_error(
-                std::format("Erro: SuperBlock inválido - Checksum incorreto. O sistema de arquivos pode estar corrompido ou não ser um EXT4.\nGravado: {}; Obtido: {}\n", this->get_raw().s_checksum, checksum));
+            throw std::logic_error(
+                std::format("SuperBlock inválido - Checksum incorreto. O sistema de arquivos pode estar corrompido ou não ser um EXT4.\nGravado: 0x{:08x}; Obtido: 0x{:08x}\n", 
+                    this->get_raw().s_checksum, checksum));
         }
     } else {
         std::println("Imagem não suporta checksum de metadados. Pulando verfificação...");

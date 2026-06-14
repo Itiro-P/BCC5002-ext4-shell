@@ -73,7 +73,7 @@ uint32_t Ext4::Checksums::checksum_dir(const Wrappers::Inode &inode,
     uint32_t current_crc = crc_32c(Utils::as_byte_span(inode.get_inode_id()), seed);
     current_crc = crc_32c(Utils::as_byte_span(inode.get_inode_generation()), current_crc);
 
-    // Corta EXATAMENTE o tamanho do campo de checksum (4 bytes) do final do bloco
+    // Corta a cauda do cálculo
     auto data = dir_block.subspan(0, block_size - sizeof(Raw::DirectoryEntryTail));       
     return crc_32c(data, current_crc);
 }

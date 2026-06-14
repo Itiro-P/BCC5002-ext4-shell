@@ -46,6 +46,13 @@ namespace Ext4::Wrappers {
          */
         explicit Image(const std::string &image_path);
 
+        /**
+         * @brief Retorna o superbloco
+         */
+        Wrappers::SuperBlock get_superblock() const {
+            return this->super_block;
+        }
+
         // Desabilita a cópia para evitar problemas de gerenciamento de recursos.
         Image(const Image&) = delete;
         Image &operator=(const Image&) = delete;
@@ -205,23 +212,21 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Escreve um inode no disco.
-         * @param inode_num O número do inode.
-         * @param inode A estrutura `inode`.
+         * @param inode O `inode`.
          */
-        void write_inode(const uint32_t inode_num, const Raw::Inode &inode);
+        void write_inode(const Wrappers::Inode &inode);
 
         /**
          * @brief Escreve um grupo de descritores no disco.
-         * @param inode_num O número do GroupDescriptor.
-         * @param gd A estrutura GroupDescriptor.
+         * @param gd O GroupDescriptor.
          */
-        void write_gdt(uint32_t group, const Raw::GroupDescriptor &gd);
+        void write_gdt(const Wrappers::GroupDescriptor &gd);
 
         /**
          * @brief Escreve um superbloco no disco.
-         * @param sp A estrutura SuperBlock.
+         * @param sb O SuperBlock.
          */
-        void write_superblock(const Raw::SuperBlock &sp);
+        void write_superblock(const Wrappers::SuperBlock &sb);
 
         /**
          * @brief Retorna o grupo de blocos que o inode pertence.
