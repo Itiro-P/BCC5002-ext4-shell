@@ -48,47 +48,7 @@ namespace Ext4::Raw {
     };
     #pragma pack(pop)
 
-    #pragma pack(push, 1)
-    /**
-     * @brief Informações de controlo da raiz de indexação HTree (struct dx_root_info).
-     * Presente apenas se o Inode do diretório possuir a flag EXT4_INDEX_FL ativa.
-     * Fica embutida logo após as entradas tradicionais de ponto "." e dois pontos "..".
-     */
-    struct DxRootInfo {
-        uint32_t reserved_zero;   // Espaço reservado obrigatório (Deve ser zero).
-        uint8_t  hash_version;    // Versão/Algoritmo do hash utilizado para indexar a árvore HTree.
-        uint8_t  info_length;     // Tamanho em bytes desta estrutura de metadados (Geralmente 8).
-        uint8_t  indirect_levels; // Quantidade de níveis de indireção/profundidade da árvore (Nível máximo: 2 ou 3).
-        uint8_t  unused_flags;    // Flags operacionais não utilizadas.
-    };
-    #pragma pack(pop)
-
-    #pragma pack(push, 1)
-    /**
-     * @brief Entrada individual de indexação por hash dentro da árvore HTree (struct dx_entry).
-     * Mapeia uma chave hash ao bloco do diretório que armazena os nomes correspondentes.
-     */
-    struct DxEntry { 
-        uint32_t hash;            // O valor de hash calculado com base no nome do ficheiro procurado.
-        uint32_t block;           // Número do bloco do diretório que contém sub-hashes ou as entradas DirectoryEntry.
-    };
-    #pragma pack(pop)
-    
-    #pragma pack(push, 1)
-    /**
-     * @brief Cauda de validação e integridade do bloco HTree (struct dx_tail).
-     * Reside estritamente nos últimos 8 bytes do bloco indexado para verificação de corrupção.
-     */
-    struct DxTail { 
-        uint32_t dt_reserved;     // Espaço reservado (Não utilizado, mas entra no cálculo do checksum).
-        uint32_t dt_checksum;     // Valor do Checksum do bloco de diretório HTree inteiro (Calculado via CRC32c).
-    };
-    #pragma pack(pop)
-
     // Asserções estáticas para assegurar conformidade milimétrica com o layout do Kernel Linux
     static_assert(sizeof(DirectoryEntry) == 8, "A estrutura base DirectoryEntry deve medir exatamente 8 bytes!");
     static_assert(sizeof(DirectoryEntryTail) == 12, "DirectoryEntryTail deve ter exatamente 12 bytes!");
-    static_assert(sizeof(DxRootInfo)     == 8, "A estrutura DxRootInfo deve medir exatamente 8 bytes!");
-    static_assert(sizeof(DxEntry)        == 8, "A estrutura DxEntry deve medir exatamente 8 bytes!");
-    static_assert(sizeof(DxTail)         == 8, "A estrutura DxTail deve medir exatamente 8 bytes!");
 }

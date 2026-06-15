@@ -35,15 +35,21 @@ Wrappers::Image::Image(const std::string &image_path) {
 
     // Calculamos o número de grupos.
     // E aproveitamos para popular os bitmaps e tabelas de inodes, já que vamos precisar deles para ler os descritores de grupo.
+    // O número de grupos de blocos varia e vem de acordo com a formatação do disco
     uint32_t group_count = this->super_block.get_group_count();
+    // O grupo de descritores têm tamanho variável e é igual a capacidade de bits do disco.
+    // - Em discos 32 bits, a estrutura vai até `bg_checksum` que usa CRC16 legado (feito para compatibilidade com o EXT3)
+    // - Em discos 64 bits, a estrutura cria novos campos `_hi` para estender os limites dos campos `_lo` antigos e o checksum
+    //   é os 16 bits inferiores de um CRC32c (polinomial de Castagnoli).
     uint16_t desc_size = this->super_block.get_desc_size();
-
-    const bool is_64 = this->super_block.is_64bit();
+    bool is_64 = this->super_block.is_64bit();
+    // Agora lemos os grupos de descritores
+    // Como eles são contíguos, seus IDS vêem de acordo com sua posição lida.
     for (uint32_t i = 0; i < group_count; i++) {
+        // Lemos a struct (uso de {} garante que campos não lidos estejam zerados para evitar erros)
         Raw::GroupDescriptor gd{};
         std::streamoff offset = gdt_offset + (static_cast<uint64_t>(i) * desc_size);
         this->read_offset(offset, Utils::as_byte_span(gd, desc_size));
-
         Wrappers::GroupDescriptor gdt = Wrappers::GroupDescriptor(gd, i, desc_size, is_64);
 
         // Checagem de checksums
@@ -52,32 +58,39 @@ Wrappers::Image::Image(const std::string &image_path) {
             rec != calc) throw std::logic_error(std::format("Checksum do grupo de descritores {} é diferente do esperado.\nGravado: 0x{:08x}; Esperado: 0x{:08x}", 
                 i, rec, calc));
 
+        // Agora (finalmente) colocamos o GD no nosso programa
         this->group_descriptors.push_back(gdt);
     }
-    this->current_inode = this->get_inode(2); // O diretório raiz está sempre no Inode 2.
+    // Normalmente o diretório raiz / está no inode de ID 2, os primeiros 10 inodes são especiais para uso do sistema
+    // Do ID 11 para frente temos diretórios e arquivos normais.
+    this->current_inode = this->get_inode(2);
     this->root_inode = this->current_inode;
     std::println("Imagem lida com sucesso!\nBem-vindo ao EXT4shell!");
 }
 
 void Wrappers::Image::seek(const std::streamoff offset) {
-    this->image_file.clear(); 
+    // Limpamos quaisquer erros anteriores
+    this->image_file.clear();
 
+    // Colocamos o cursor na posição desejada
     this->image_file.seekg(offset, std::ios::beg);
     this->image_file.seekp(offset, std::ios::beg);
 
+    // Se deu erro
     if (!this->image_file) {
         throw std::runtime_error(std::format("Seek falhou no offset {}.", offset));
     }
 }
 
 void Wrappers::Image::read_offset(const std::streamoff offset, std::span<std::byte> buffer) {
+    // Colocamos o cursor na posição (deslocamento) desejado
     this->seek(offset);
     
     // Executa a leitura binária convertendo o span de bytes para char*
     this->image_file.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
     
+    // Contamos os bytes lidos para checagem de erros
     std::streamsize read_bytes = this->image_file.gcount();
-
     if (read_bytes != static_cast<std::streamsize>(buffer.size())) {
         // Se falhou, limpa o estado de erro para não travar os próximos comandos da aplicação
         this->image_file.clear(); 
@@ -90,14 +103,19 @@ void Wrappers::Image::read_offset(const std::streamoff offset, std::span<std::by
 }
 
 void Wrappers::Image::read_block(const uint64_t block_num, std::span<std::byte> buffer) {
+    // O deslocamento que se encontra o bloco vem do fato do EXT4 usar alocação contígua.
+    // Então multiplicamos o número do bloco pelo tamanho de um bloco para saber sua posição no disco.
     std::streamoff offset = block_num * this->super_block.get_block_size();
+    // Agora lemos
     this->read_offset(offset, buffer);
 }
 
 void Wrappers::Image::write_offset(const std::streamoff offset, const std::span<const std::byte> buffer) {
+    // Colocamos o cursor na posição desejada e escrevemos
     this->seek(offset);
     this->image_file.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 
+    // Checagem de (possíveis) erros
     if (!this->image_file) {
         this->image_file.clear();
         throw std::runtime_error(std::format(
@@ -106,33 +124,47 @@ void Wrappers::Image::write_offset(const std::streamoff offset, const std::span<
         ));
     }
 
+    // Atualiza (sincroniza) o buffer do `fstream` para que trabalhemos sem com a imagem atualizada.
     this->image_file.flush();
 }
 
 void Wrappers::Image::write_block(const uint64_t block_num, const std::span<const std::byte> buffer) {
+    // O deslocamento que se encontra o bloco vem do fato do EXT4 usar alocação contígua.
+    // Então multiplicamos o número do bloco pelo tamanho de um bloco para saber sua posição no disco.
     std::streamoff offset = block_num * this->super_block.get_block_size();
+    // Agora escrevemos
     this->write_offset(offset, buffer);
 }
 
 uint32_t Ext4::Wrappers::Image::get_inode_group(const uint32_t ino) {
+    // Os IDS dos inodes começam do ID 1, deslocamos para zero para evitar deslocamento problemático
     return (ino - 1) / this->super_block.get_inodes_per_group();
 }
 
 uint32_t Ext4::Wrappers::Image::get_inode_bit_pos(const uint32_t ino) {
+    // Os IDS dos inodes começam do ID 1, deslocamos para zero para evitar deslocamento problemático.
+    // O módulo é usado pois o tamanho do bitmap não é infinito e normalmente é o tamanho de um bloco.
+    // Assim, blocos de 1024B, um inode 1025 estará no bit 2.
     return (ino - 1) % this->super_block.get_inodes_per_group();
 }
 
 uint32_t Ext4::Wrappers::Image::get_block_group(const uint32_t blk) {
+    // Mesma coisa do inode mas agora para o grupo que o bloco pertence.
+    // A posição do primeiro bloco de dados pode variar, então usamos um getter para evitar problemas de
+    // compatibilidade entre sistemas de arquivos com blocos de tamanhos diferentes.
     return (blk - this->super_block.get_first_data_block()) / this->super_block.get_blocks_per_group();
 }
 
 uint32_t Ext4::Wrappers::Image::get_block_bit_pos(const uint32_t blk) {
+    // Mesma coisa do inode mas agora para o grupo que o bloco pertence.
+    // A posição do primeiro bloco de dados pode variar, então usamos um getter para evitar problemas de
+    // compatibilidade entre sistemas de arquivos com blocos de tamanhos diferentes.
     return (blk - this->super_block.get_first_data_block()) % this->super_block.get_blocks_per_group();
 }
 
 std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num) {
-    // Validação preventiva: Inodes no EXT4 começam obrigatoriamente no índice 1
-    if (inode_num == 0 || inode_num > this->super_block.get_inodes_count()) {
+    // Validação preventiva: Inodes válidos no EXT4 começam obrigatoriamente no índice 11
+    if (inode_num < 11 || inode_num > this->super_block.get_inodes_count()) {
         throw std::logic_error(std::format("Erro: Número de inode inválido ou fora dos limites: {}", inode_num));
     }
 
@@ -146,7 +178,7 @@ std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num)
     uint64_t table_base_offset = this->group_descriptors[group].get_inode_table_block() * this->super_block.get_block_size();
     
     // Calcular a posição absoluta do inode alvo
-    std::streamoff final_inode_offset = table_base_offset + (static_cast<uint64_t>(index) * this->super_block.get_inode_size());
+    std::streamoff final_inode_offset = table_base_offset + (static_cast<std::streamoff>(index) * this->super_block.get_inode_size());
     return final_inode_offset;
 }
 
@@ -158,33 +190,40 @@ Wrappers::Inode Wrappers::Image::get_inode(const uint32_t inode_num) {
     // Então só copiaremos os bytes excedentes para calculo do checksum
     std::vector<std::byte> buffer(this->super_block.get_inode_size());
     this->read_offset(this->get_inode_offset(inode_num), Utils::as_byte_span(buffer));
-
+    // Lemos a struct
     Raw::Inode inode = Utils::copy<Raw::Inode>(buffer, sizeof(Raw::Inode));
 
+    // Agora lemos os byte extras.
+    // As imagens não usam EXT4_INLINE, então os inodes não guardam nada relevante depois de 160 bytes.
+    // Mas, creio que que há algo do Xattr ainda lá. Só ignoraremos por enquanto pois não usamos nesse projeto 
+    //  (mas ainda copiamos eles para validar e refazer o cheksum).
     std::vector<std::byte> excess_bytes;
+    // Lemos os byte extras e colocamos no wrapper
     excess_bytes.append_range(Utils::as_span<std::byte>(buffer, sizeof(Raw::Inode)));
+    Wrappers::Inode wrapper = Wrappers::Inode(inode_num, this->get_volume_uuid(), this->super_block.get_inode_size(), inode, excess_bytes);
 
     // Checagem de checksums
     if (this->super_block.has_metadata_csum()) {
-        Wrappers::Inode wrapper = Wrappers::Inode(inode_num, this->get_volume_uuid(), this->super_block.get_inode_size(), inode, excess_bytes);
         if (uint32_t rec = wrapper.get_checksum(),
             calc = Checksums::checksum_inode(wrapper, this->super_block.get_checksum_seed());
             rec != calc) throw std::logic_error(std::format("Checksum do inode {} não condiz com o checksum calculado.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}", 
                 inode_num, calc, rec));
     }
 
-    Wrappers::Inode wrapper = Wrappers::Inode(inode_num, this->get_volume_uuid(), this->super_block.get_inode_size(), inode, excess_bytes);
-
     return wrapper;
 }
 
 std::vector<uint64_t> Wrappers::Image::read_blocks_from_leafs(std::span<const std::byte> node_data, const Raw::ExtentHeader &header) {
+    // Quando o sistema usa extents, pode ocorrer duas coisas (sendo uma):
+    // - O ExtentHeader sinalizar que os próximos bytes são ExtentLeafs (então só lemos os dados)
     std::vector<uint64_t> blocks;
+    // Usamos `std::span` aqui para ler após os 12 bytes do ExtentHeader (melhor que manipulação de ponteiros eu acho)
     std::span<const Raw::ExtentLeaf> leafs = Utils::as_span<const Raw::ExtentLeaf>(
         node_data, 
         sizeof(Raw::ExtentHeader), 
         header.eh_entries * sizeof(Raw::ExtentLeaf)
     );
+    // Agora lemos os IDS dos blocos que as folhas apontam
     for (const auto &leaf : leafs) {
         uint64_t start_block = leaf.get_start_block();
         uint16_t length = leaf.get_real_length();
@@ -198,18 +237,23 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_leafs(std::span<const st
 std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(const Wrappers::Inode &inode, 
     std::span<const std::byte> node_data, 
     const Raw::ExtentHeader &header) {
-    std::vector<uint64_t> blocks{};
     
+    // Vemos se o número mágico é válido
     if (header.eh_magic != Constants::EXTENT_MAGIC) {
         throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico de extents inválido.");
     }
-
+    // Quando o sistema usa extents, pode ocorrer duas coisas (sendo uma):
+    // - O ExtentHeader sinalizar que os próximos bytes são ExtentIndex. 
+    //     Então devemos ir até o bloco que o ExtentIndex aponta e fazer o processo recursivamente até achar um ExtentHeader onde eh_depth == 0
+    //     e os próximos bytes forem folhas que agora finalmente apontam para dados.
+    std::vector<uint64_t> blocks{};
     std::span<const Raw::ExtentIndex> index_entries = Utils::as_span<const Raw::ExtentIndex>(
         node_data, 
         sizeof(Raw::ExtentHeader), 
         header.eh_entries * sizeof(Raw::ExtentIndex)
     );
 
+    // Criamos um vetor alocado com o tamanho de um bloco para otimizar alocação.
     std::vector<std::byte> buffer(this->super_block.get_block_size());
     for (const auto &index : index_entries) {
         uint64_t child_block = index.get_leaf_block();
@@ -218,10 +262,12 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(const Wrappers::In
         this->read_block(child_block, Utils::as_byte_span(buffer));
         Raw::ExtentHeader child_header = Utils::copy<Raw::ExtentHeader>(buffer);
 
+        // Checagem de número mágico
         if (child_header.eh_magic != Constants::EXTENT_MAGIC) {
             throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico inválido no nó filho.");
         }
 
+        // Aqui vemos se fazemos o processo recursivo ou não
         if (child_header.eh_depth == 0) {
             // Passa por valor. read_blocks_from_leafs processa e joga os dados no vector 'child_blocks'
             auto child_blocks = this->read_blocks_from_leafs(Utils::as_byte_span(buffer), child_header);
@@ -233,8 +279,9 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(const Wrappers::In
         }
     }
 
-    // Checagem de checkums
+    // Checagem de checksums
     if (this->super_block.has_metadata_csum()) {
+        // Lemos os últimos 4 bytes do bloco para colocar em `ExtentTail` que contém o checksum de metadados
         Raw::ExtentTail tail = Utils::copy<Raw::ExtentTail>(Utils::as_span<std::byte>(buffer, buffer.size() - sizeof(Raw::ExtentTail)));
         if (uint32_t calc = Checksums::checksum_extent(inode, Utils::as_byte_span(buffer), buffer.size(), this->super_block.get_checksum_seed()); 
             tail.eb_checksum != calc)
@@ -248,12 +295,17 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(const Wrappers::In
 
 std::vector<uint64_t> Wrappers::Image::get_blocks(const Wrappers::Inode &inode) {
     std::vector<uint64_t> data_blocks;
+    // Aqui é o array com dados do inode.
+    // Consideramos que o sistema de arquivos sempre usa extents. Então teremos a árvore de extents aqui
     std::array<std::byte, 60> i_blocks = inode.get_i_block();
+    // Copiamos só o cabeçalho (`ExtentIndex`) para ver como devemos interpretar os próximos dados
     Raw::ExtentHeader header = Utils::copy<Raw::ExtentHeader>(i_blocks);
 
+    // Checagem de segurança
     if (header.eh_magic != Constants::EXTENT_MAGIC)
         throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico de extents inválido. O Inode pode estar corrompido ou não utilizar extents.");
 
+    // Criamos um `std::span` para evitar cópia na (possível) recursão
     std::span blocks_span = Utils::as_byte_span(i_blocks);
 
     if (header.eh_depth == 0) {
@@ -268,8 +320,10 @@ std::vector<uint64_t> Wrappers::Image::get_blocks(const Wrappers::Inode &inode) 
 
 std::vector<std::byte> Wrappers::Image::read_file(const Wrappers::Inode &inode) {
     std::vector<std::byte> file_data;
+    // Pegamos os blocos dos dados do inode para montar os bytes do ficheiro
     std::vector<uint64_t> data_blocks = this->get_blocks(inode);
     for (const auto &block_num : data_blocks) {
+        // Lemos cada bloco e colocamos no nosso vetor de bytes
         std::vector<std::byte> buffer(this->super_block.get_block_size());
         this->read_block(block_num, Utils::as_byte_span(buffer));
         file_data.insert(file_data.end(), buffer.begin(), buffer.end());
@@ -281,11 +335,13 @@ std::vector<std::byte> Wrappers::Image::read_file(const Wrappers::Inode &inode) 
 
 
 std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std::string &path, const Wrappers::Inode &base) {
+    // Evitar burradas do usuário
     if (path.empty() || path == "." || this->get_current_path().ends_with(path)) return {base, this->get_current_path()};
     if (path == "/") return {this->get_root_inode(), "/"};
 
-    bool is_root = path[0] == '/';
+    bool is_root = (path[0] == '/');
 
+    // Se o path começar com /, então devemos começar a montagem do diretório do inode da raíz
     Wrappers::Inode inode = is_root ? this->get_root_inode() : base;
     std::vector<std::string> paths = Utils::filter_split(path, "/");
     
@@ -341,11 +397,22 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
 
 std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::Inode &inode) {
     std::vector<Wrappers::DirectoryEntry> entries{};
+    // Só diretórios têm entries
     if (!inode.is_dir()) return entries;
+    // Pegamos os dados do inode
     std::vector<std::byte> bytes = this->read_file(inode);
     size_t offset = 0;
 
-    // Checagem de checksums
+    // Checagem de checkums
+    // Aqui temos problemas
+    // Muito por compatibilidade, quando usamos diretórios com checksum de metadados, 
+    //  os últimos 12 bytes são "ocultos" do sistemas de arquivos e indicam uma nova estrutura `DirrectoryEntryTail` que:
+    // - Têm 4 bytes que são zero (para o sistema de arquivos achar que não tem algo lá)
+    // - Têm 2 bytes de rec_len (sempre 12)
+    // - Têm 1 byte que é zero
+    // - Têm 1 bytes que indicam o tipo de arquivo (0xDE: EXT4_FT_DIR_CSUM)
+    // - Têm 4 bytes que formam o checksum
+    // Devemos ler essa estrutura com cuidado para evitar de ler dados corruptos.
     if (this->super_block.has_metadata_csum()) {
         uint32_t block_size = this->super_block.get_block_size();
         Raw::DirectoryEntryTail tail = Utils::copy<Raw::DirectoryEntryTail>(Utils::as_span<std::byte>(bytes, block_size - sizeof(Raw::DirectoryEntryTail)));
@@ -362,25 +429,33 @@ std::vector<Wrappers::DirectoryEntry> Wrappers::Image::list_dir(const Wrappers::
         }
     }
 
+    // A leitura das entradas do diretório não é linearmente constante.
+    // Pois o nome da entrada pode variar e é necessário que não haja padding entre entradas.
+    // Então lemos a estrutura crua primeiro e depois (com a ajuda de seus dados) lemos a string que representa seu nome.
     while (offset < inode.get_size()) {
         std::span<const std::byte> current_view(bytes.data() + offset, bytes.size() - offset);
-
+        // Lemos a estrutura crua da entrada atual
         Raw::DirectoryEntry entry = Utils::copy<Raw::DirectoryEntry>(current_view);
+        // rec_len é o tamanho da estrutura + tamanho do nome (então deve ser maior que 0)
         if (entry.rec_len == 0) break;
 
+        // Vemos se chegamos em uma entrada válida
         if (entry.inode != 0) {
+            // Lemos o nome, botamos num `std::string` e colocamos no nosso vetor resultante
             std::span<const std::byte> name_span = current_view.subspan(sizeof(Raw::DirectoryEntry), entry.name_len);
             entries.push_back({entry, std::string{
                 reinterpret_cast<const char*>(name_span.data()), 
                 name_span.size()
             }});
         }
+        // Pulamos de rec_len em rec_len
         offset += entry.rec_len;
     }
     return entries;
 }
 
 void Ext4::Wrappers::Image::write_inode(const Wrappers::Inode &inode) {
+    // Vemos onde ele está no disco
     std::streamoff offset = this->get_inode_offset(inode.get_inode_id());
 
     // Cálculo do checksum para gravação
@@ -405,6 +480,7 @@ void Ext4::Wrappers::Image::write_gdt(const Wrappers::GroupDescriptor &gd) {
     Raw::GroupDescriptor new_raw = copy.get_raw();
     new_raw.bg_checksum = check;
     copy.set_raw(new_raw);
+    // Agora escrevemos e atualizamos nosso vetor de GDs
     this->write_offset(offset, Utils::as_byte_span(new_raw, desc_size));
     this->group_descriptors[copy.get_group_number()] = copy;
 }
