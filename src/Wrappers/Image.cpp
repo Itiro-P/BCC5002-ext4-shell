@@ -163,8 +163,8 @@ uint32_t Ext4::Wrappers::Image::get_block_bit_pos(const uint32_t blk) {
 }
 
 std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num) {
-    // Validação preventiva: Inodes válidos no EXT4 começam obrigatoriamente no índice 11
-    if (inode_num < 11 || inode_num > this->super_block.get_inodes_count()) {
+    // Validação preventiva: Inodes válidos no EXT4 começam obrigatoriamente no índice 1
+    if (inode_num < 1 || inode_num > this->super_block.get_inodes_count()) {
         throw std::logic_error(std::format("Erro: Número de inode inválido ou fora dos limites: {}", inode_num));
     }
 
@@ -838,7 +838,7 @@ uint64_t Ext4::Wrappers::Image::entry_logical_offset(std::span<const Wrappers::D
 
 void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint32_t target_ino, const std::string &name, const uint8_t file_type) {
     // Guardas para evitar burradas do usuário
-    if (dir_inode.get_inode_id() < 11 || target_ino < 1 || name.empty()) return;
+    if (dir_inode.get_inode_id() < 1 || target_ino < 1 || name.empty()) return;
   
     // Listamos as entradas do PAI
     std::vector<Wrappers::DirectoryEntry> entries = this->list_dir(dir_inode);
@@ -1019,7 +1019,10 @@ void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, c
     // Chegou a 0? Então deve ser excluído
     if (raw.i_links_count == 0) {
         std::vector<uint64_t> blocks = this->get_blocks(this->get_inode(ino));
-        this->free_inode(ino);
+        raw.i_dtime = static_cast<uint32_t>(std::time(nullptr));
+        inode.set_raw(raw);
+        this->write_inode(inode);   // grava i_dtime antes de liberar
+        this->free_inode(ino);      // libera o bit no bitmap
         for (const auto &blk : blocks) this->free_block(blk);
     } else {
         inode.set_raw(raw);
