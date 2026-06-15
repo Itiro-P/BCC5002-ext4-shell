@@ -560,10 +560,10 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
     if (this->super_block.has_metadata_csum())
         Utils::split(new_bitmap_csum, new_raw.bg_inode_bitmap_csum_lo, new_raw.bg_inode_bitmap_csum_hi);
     
-    uint32_t new_inode_count = to_change.get_free_inodes_count() -1;
+    uint32_t new_inode_count = to_change.get_free_inodes_count() - 1;
     Utils::split(new_inode_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
     
-    uint32_t new_itable_unused = to_change.get_itable_unused() -1;
+    uint32_t new_itable_unused = to_change.get_itable_unused() - 1;
     Utils::split(new_itable_unused, new_raw.bg_itable_unused_lo, new_raw.bg_itable_unused_hi);
 
     to_change.set_raw(new_raw);
@@ -625,15 +625,91 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
     if (this->super_block.has_metadata_csum())
         Utils::split(new_bitmap_csum, new_raw.bg_block_bitmap_csum_lo, new_raw.bg_block_bitmap_csum_hi);
 
-    uint32_t new_block_count = to_change.get_free_blocks_count() -1;
+    uint32_t new_block_count = to_change.get_free_blocks_count() - 1;
     Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
 
     to_change.set_raw(new_raw);
     this->write_gdt(to_change);
 
     Raw::SuperBlock sb_raw = this->super_block.get_raw();
-    uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
-    global_free_blocks--;
+    uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi) - 1;
+    Utils::split(global_free_blocks, sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
+    this->write_superblock(Wrappers::SuperBlock(sb_raw));
+
+    return gd_id * this->super_block.get_blocks_per_group() + bit_pos;
+}
+
+uint32_t Ext4::Wrappers::Image::alloc_contiguous_blocks(const uint32_t amount) {
+    bool stop = false;
+    std::vector<Wrappers::GroupDescriptor> &gds = this->group_descriptors;
+
+    uint32_t gd_id = 0, bit_pos = 0;
+
+    // Possível novo checksum de bitmap
+    uint32_t new_bitmap_csum = 0;
+
+    for (size_t i = 0; i < gds.size(); i++) {
+        if (stop) break;
+
+        std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
+        auto full_span = Utils::as_byte_span(block_bitmap);
+        this->read_block(gds[i].get_block_bitmap_block(), full_span);
+
+        auto bitmap_span = full_span.subspan(0, this->super_block.get_blocks_per_group() / 8);
+
+        // Checagem de checksums
+        if (this->super_block.has_metadata_csum()) {
+            if (uint32_t rec = gds[i].get_block_bitmap_checksum(), calc = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()); 
+                rec != calc) throw std::logic_error(std::format("Checksum para o bitmap de blocos do GDT {} inválido.\nCalculado: 0x{:08x}; Gravado: 0x{:08x}.", 
+                    i, calc, rec));
+        }
+
+        for (size_t j = 0; j < bitmap_span.size() * 8; ++j) {
+            if (Utils::test_bit(bitmap_span, j)) continue;
+
+            // verifica se cabem 'amount' blocos a partir de j
+            if (j + amount > bitmap_span.size() * 8) break;
+
+            bool fits = true;
+            for (uint32_t k = j + 1; k < j + amount; ++k) {
+                if (Utils::test_bit(bitmap_span, k)) {
+                    fits = false;
+                    j = k; // pula direto para o bloco que falhou
+                    break;
+                }
+            }
+
+            if (!fits) continue;
+
+            // aloca todos os blocos da janela
+            for (uint32_t k = j; k < j + amount; ++k) Utils::set_bit(bitmap_span, k, 1);
+
+            this->write_block(gds[i].get_block_bitmap_block(), full_span);
+            if (this->super_block.has_metadata_csum())
+                new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
+
+            gd_id = i;
+            bit_pos = j; // primeiro bloco da sequência
+            stop = true;
+            break;
+        }
+    }
+
+    if (!stop) throw std::runtime_error("Sem espaço: nenhum bloco livre disponível.");
+
+    Wrappers::GroupDescriptor to_change = gds[gd_id];
+    Raw::GroupDescriptor new_raw = to_change.get_raw();
+    if (this->super_block.has_metadata_csum())
+        Utils::split(new_bitmap_csum, new_raw.bg_block_bitmap_csum_lo, new_raw.bg_block_bitmap_csum_hi);
+
+    uint32_t new_block_count = to_change.get_free_blocks_count() - amount;
+    Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
+
+    to_change.set_raw(new_raw);
+    this->write_gdt(to_change);
+
+    Raw::SuperBlock sb_raw = this->super_block.get_raw();
+    uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi) - amount;
     Utils::split(global_free_blocks, sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
     this->write_superblock(Wrappers::SuperBlock(sb_raw));
 

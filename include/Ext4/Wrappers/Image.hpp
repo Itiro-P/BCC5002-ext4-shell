@@ -46,13 +46,7 @@ namespace Ext4::Wrappers {
          */
         explicit Image(const std::string &image_path);
 
-        /**
-         * @brief Retorna o superbloco
-         */
-        Wrappers::SuperBlock get_superblock() const {
-            return this->super_block;
-        }
-
+        
         // Desabilita a cópia para evitar problemas de gerenciamento de recursos.
         Image(const Image&) = delete;
         Image &operator=(const Image&) = delete;
@@ -69,7 +63,7 @@ namespace Ext4::Wrappers {
          * @param inode_um O número do inode.
          */
         std::streamoff get_inode_offset(const uint32_t inode_num);
-
+        
         /**
          * @brief Método auxiliar para ler um offset de dados da imagem, garantindo que a quantidade de bytes lida seja a esperada.
          * @param offset O deslocamento em bytes a partir do início da imagem para onde o ponteiro deve ser movido.
@@ -85,7 +79,7 @@ namespace Ext4::Wrappers {
          * @throws `std::runtime_error` Se a quantidade de bytes lida for diferente do esperado ou se ocorrer um erro de leitura.
          */
         void read_block(const uint64_t block_num, std::span<std::byte> buffer);
-
+        
         /**
          * @brief Método auxiliar para escrever um offset de dados da imagem, garantindo que a quantidade de bytes escrita seja a esperada.
          * @param offset O deslocamento em bytes a partir do início da imagem para onde o ponteiro deve ser movido.
@@ -101,6 +95,13 @@ namespace Ext4::Wrappers {
          * @throws `std::runtime_error` Se a quantidade de bytes escrita for diferente do esperado ou se ocorrer um erro de leitura.
          */
         void write_block(const uint64_t block_num, const std::span<const std::byte> buffer);
+        
+        /**
+         * @brief Retorna o superbloco
+         */
+        Wrappers::SuperBlock get_superblock() const {
+            return this->super_block;
+        }
 
         /**
          * @brief Retorna o inode root encapsulado em um `Inode`, que fornece métodos de conveniência para acessar os metadados do inode.
@@ -109,7 +110,7 @@ namespace Ext4::Wrappers {
         Wrappers::Inode get_root_inode() const {
             return this->root_inode;
         }
-
+        
         /**
          * @brief Retorna o inode atual encapsulado em um `Inode`, que fornece métodos de conveniência para acessar os metadados do inode.
          * @returns O `Inode` do inode atual.
@@ -275,6 +276,13 @@ namespace Ext4::Wrappers {
          * @returns O ID do novo bloco.
          */
         uint32_t alloc_block();
+
+        /**
+         * @brief Aloca uma série contígua de blocos.
+         * @param amount A quantidade de blocos para alocar.
+         * @returns O ID do primeiro bloco do conjunto.
+         */
+        uint32_t alloc_contiguous_blocks(const uint32_t amount);
 
         /**
          * @brief Libera um inode.

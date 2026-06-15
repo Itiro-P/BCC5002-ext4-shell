@@ -159,12 +159,12 @@ short Command::test_block(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::cp(Image &img, const std::vector<std::string> &args) {
+short Command::to_in(Image &img, const std::vector<std::string> &args) {
     const std::string source_path = args.size() > 1 ? args[1] : "";
     const std::string dest_path = args.size() > 2 ? args[2] : "";
 
     if (source_path.empty() || dest_path.empty()) {
-        std::println(std::cerr, "Uso: cp <arquivo1> <arquivo2>");
+        std::println(std::cerr, "Uso: import <arquivo do SO> <diretório da imagem>");
         return 1;
     }
 
@@ -172,6 +172,21 @@ short Command::cp(Image &img, const std::vector<std::string> &args) {
 
     return 0;
 }
+
+short Command::to_out(Image &img, const std::vector<std::string> &args) {
+    const std::string source_path = args.size() > 1 ? args[1] : "";
+    const std::string dest_path = args.size() > 2 ? args[2] : "";
+
+    if (source_path.empty() || dest_path.empty()) {
+        std::println(std::cerr, "Uso: export <arquivo da imagem> <diretório do SO>");
+        return 1;
+    }
+
+    // necessário implementar
+
+    return 0;
+}
+
 
 short Command::pwd(Image &img) {
     std::println("{}", img.get_current_path());
