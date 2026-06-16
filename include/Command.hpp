@@ -17,7 +17,7 @@ namespace Command {
     /**
      * @brief Estrutura para armazenar informações sobre os comandos disponíveis no shell.
      */
-    inline constexpr std::array<std::pair<std::string_view, std::string_view>, 17> command_info{{
+    inline constexpr std::array<std::pair<std::string_view, std::string_view>, 18> command_info{{
         {"help",                            "Exibe este comando."},
         {"info",                            "Exibe informações da imagem e do sistema de arquivos."},
         {"cat <arquivo>",                   "Exibe o conteúdo de um arquivo no formato texto."},
@@ -26,7 +26,8 @@ namespace Command {
         {"ls <diretório>",                  "Lista o conteúdo do diretório atual ou o especificado (caso <diretório> seja fornecido)."},
         {"testi <inode>",                   "Testa se um `inode` está livre ou ocupado."},
         {"testb <bloco>",                   "Testa se um `bloco` está livre ou ocupado."},
-        {"cp/export <arquivo1> <arquivo2>", "Copia um arquivo para outro local."},
+        {"import <arquivo do SO> <diretório da imagem>", "Copia arquivo do SO para a imagem."},
+        {"export <arquivo da imagem> <diretório da máquina>", "Copia arquivo da imagem para o SO."},
         {"pwd",                             "Exibe o caminho do diretório atual."},
         {"touch <arquivo>",                 "Cria um novo arquivo vazio ou atualiza a data de modificação de um arquivo existente."},
         {"mkdir <diretório>",               "Cria um novo diretório."},
@@ -100,13 +101,22 @@ namespace Command {
     short test_block(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
-     * @brief Copia um arquivo para outro local.
-     * Na especificação do trabalho, o nome do comando deveria ser `export`. Mas, ao menos no `C++23`, `export` é uma palavra reservada, então o nome do comando foi alterado para `cp`.
+     * @brief Move um arquivo para a máquina real.
+     * Na especificação do trabalho, o nome do comando deveria ser `export`. Mas, ao menos no `C++23`, `export` é uma palavra reservada, então o nome do comando foi alterado para `to_out`.
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
-     * @param args O vetor de argumentos, onde `args[1]` é o caminho do arquivo de origem e `args[2]` é o caminho do destino.
+     * @param args O vetor de argumentos, onde `args[1]` é o caminho do arquivo de origem e `args[2]` é o caminho do destino (sistema real).
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
      */
-    short cp(Wrappers::Image &img, const std::vector<std::string> &args);
+    short to_out(Wrappers::Image &img, const std::vector<std::string> &args);
+
+    /**
+     * @brief Move um arquivo para a imagem.
+     * Na especificação do trabalho, o nome do comando deveria ser `import`. Mas, ao menos no `C++23`, `import` é uma palavra reservada, então o nome do comando foi alterado para `to_in`.
+     * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
+     * @param args O vetor de argumentos, onde `args[1]` é o caminho do arquivo de origem e `args[2]` é o caminho do destino (imagem).
+     * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     */
+    short to_in(Wrappers::Image &img, const std::vector<std::string> &args);
 
     /**
      * @brief Exibe o diretório atual.
