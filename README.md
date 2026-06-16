@@ -2,11 +2,12 @@
 
 Este é o código para o projeto final da disciplina de Sistemas Operacionais (5002). O objetivo é manipular manualmente imagens em *ext4* usando a linguagem de programação `C++`.
 
-**Estrutura mínima do repositório**
+**Estrutura do repositório**
 
-- `main.cpp` — código-fonte principal.
+- `main.cpp` — ponto de execução do programa.
+- `src/`     — código-fonte do programa.
 - `Makefile` — regras de compilação.
-- `LICENSE` — licença do projeto.
+- `LICENSE`  — licença do projeto.
 
 **Requisitos**
 
@@ -57,7 +58,7 @@ Opções recomendadas:
 Após compilar, execute:
 
 ```bash
-./ext4shell
+./ext4shell <imagem EXT4>
 ```
 
 **Notas**
