@@ -549,6 +549,7 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
                 bit_pos = j;
                 this->write_block(gds[gd_id].get_inode_bitmap_block(), full_span);
 
+                // Criamos um novo checksum do bitmap
                 if (this->super_block.has_metadata_csum())
                     new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
 
@@ -618,6 +619,7 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
                 bit_pos = j;
                 this->write_block(gds[gd_id].get_block_bitmap_block(), full_span);
 
+                // Criamos um novo checksum
                 if (this->super_block.has_metadata_csum())
                     new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
 
