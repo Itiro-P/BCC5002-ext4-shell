@@ -1,6 +1,15 @@
 #include "../include/Ext4.hpp"
 #include <print>
 
+/**
+ * @file    Checksums.cpp
+ * @brief   Implementação de checksums usados no EXT4
+ * @author  Pedro Itiro Nagao
+ * @date    2025-06-14
+ *
+ * Funções de checksum (metadados e CRC16 para os grupos de descritores) para cálculo rápido
+ */
+
 uint16_t Ext4::Checksums::crc_16(const std::span<const std::byte> data, const uint16_t seed) {
     return crc_generic<CRC16_Config>(data, seed);
 }

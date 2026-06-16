@@ -8,6 +8,13 @@
 #include <unordered_set>
 #include <functional>
 
+/**
+ * @file    Shell.hpp
+ * @brief   Cabeçalho da classe `Shell`. Responsável por passar a entrada do usuário para suas respectivas funções.
+ * @author  Pedro Itiro Nagao
+ * @date    2025-06-14
+ *
+ */
 
 typedef std::vector<std::string> CommandArgs;
 
@@ -15,7 +22,6 @@ using Wrappers::Image;
 
 /**
  * @brief Classe responsável por representar a interface de linha de comando do shell.
- * @author Pedro Itiro Nagao
  */
 class Shell {
     // Imagem que será carregada e manipulada pelos comandos do shell.

@@ -4,6 +4,13 @@
 #include <ranges>
 #include <algorithm>
 
+/**
+ * @file    Command.cpp
+ * @brief   Implementação dos comandos do projeto.
+ * 
+ * Implementação dos comandos especificados do projeto.
+ */
+
 using Ext4::Wrappers::Image;
 
 short Command::help() {

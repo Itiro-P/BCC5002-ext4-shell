@@ -10,12 +10,17 @@
 using namespace Ext4;
 
 /**
+ * @file    Command.hpp
+ * @brief   Cabeçalho com definições dos comandos do projeto.
+ */
+
+/**
  * @brief Namespace que contém as definições dos comandos disponíveis no shell.
- * @author Pedro Itiro Nagao
  */
 namespace Command {
     /**
      * @brief Estrutura para armazenar informações sobre os comandos disponíveis no shell.
+     * Uso de `std::string_view` aqui é para garantir que esta variável não fique na `heap`
      */
     inline constexpr std::array<std::pair<std::string_view, std::string_view>, 18> command_info{{
         {"help",                            "Exibe este comando."},
@@ -41,6 +46,8 @@ namespace Command {
     /**
      * @brief Exibe a lista de comandos disponíveis.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-08
      */
     short help();
 
@@ -56,6 +63,8 @@ namespace Command {
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser exibido.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-08
      */
     short cat(Wrappers::Image &img, const std::span<const std::string> args);
 
@@ -72,6 +81,8 @@ namespace Command {
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório destino.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-09
      */
     short cd(Wrappers::Image &img, const std::span<const std::string> args);
 
@@ -81,6 +92,8 @@ namespace Command {
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório a ser visualizado.
      * Caso não seja fornecido um argumento, o conteúdo do diretório atual será listado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-09
      */
     short ls(Wrappers::Image &img, const std::span<const std::string> args);
 
@@ -122,6 +135,8 @@ namespace Command {
      * @brief Exibe o diretório atual.
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-10
      */
     short pwd(Wrappers::Image &img);
 
@@ -130,6 +145,8 @@ namespace Command {
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser criado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-10
      */
     short touch(Wrappers::Image &img, const std::span<const std::string> args);
 
@@ -146,6 +163,8 @@ namespace Command {
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do arquivo a ser removido.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-10
      */
     short rm(Wrappers::Image &img, const std::span<const std::string> args);
 
@@ -162,12 +181,16 @@ namespace Command {
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @param args O vetor de argumentos, onde `args[1]` é o caminho atual do arquivo e `args[2]` é o novo nome/caminho.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-11
      */
     short rename(Wrappers::Image &img, const std::span<const std::string> args);
 
     /**
      * @brief Limpa o terminal.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
+     * @author  Pedro Itiro Nagao
+     * @date    2025-06-11
      */
     short clear();
 }

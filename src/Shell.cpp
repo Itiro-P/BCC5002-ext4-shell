@@ -2,6 +2,16 @@
 #include <iostream>
 #include <vector>
 
+/**
+ * @file    Shell.cpp
+ * @brief   Implementação do shell interativo
+ * @author  Pedro Itiro Nagao
+ * @date    2025-06-11
+ *
+ * Responsável por passar os argumentos da entrada do usuário para as respectivas funções.
+ */
+
+
 short Shell::run() {
     std::string line;
 
