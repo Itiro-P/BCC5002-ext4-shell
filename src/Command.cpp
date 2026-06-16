@@ -17,7 +17,7 @@ short Command::info(Image &img) {
     return 0;
 }
 
-short Command::cat(Image &img, const std::vector<std::string> &args) {
+short Command::cat(Image &img, const std::span<const std::string> args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if (file_path.empty()) {
@@ -51,7 +51,7 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
 
     // Agora (finalmente) listamos o conteúdo do arquivo
     Wrappers::Inode file_inode = img.get_inode(target_file->get_inode());
-    
+
     std::vector<std::byte> bytes = img.read_file(file_inode);
 
     std::string_view content(reinterpret_cast<const char*>(bytes.data()), bytes.size());
@@ -59,7 +59,7 @@ short Command::cat(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::attr(Image &img, const std::vector<std::string> &args) {
+short Command::attr(Image &img, const std::span<const std::string> args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if (target_path.empty()) {
@@ -72,14 +72,14 @@ short Command::attr(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::cd(Image &img, const std::vector<std::string> &args) {
+short Command::cd(Image &img, const std::span<const std::string> args) {
     const std::string target_path = args.size() > 1 ? args[1] : "";
 
     if (target_path.empty()) {
         std::println(std::cerr, "Uso: cd <diretório>");
         return 1;
     }
-    
+
     // Procuramos o diretório
     auto [parent_dir, resolved_path] = img.resolve_path(target_path, img.get_current_inode());
 
@@ -96,7 +96,7 @@ short Command::cd(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::ls(Image &img, const std::vector<std::string> &args) {
+short Command::ls(Image &img, const std::span<const std::string> args) {
     const std::string target_path = args.size() > 1 ? args[1] : img.get_current_path();
     auto [parent_dir, _] = img.resolve_path(target_path, img.get_current_inode());
 
@@ -108,7 +108,7 @@ short Command::ls(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::test_inode(Image &img, const std::vector<std::string> &args) {
+short Command::test_inode(Image &img, const std::span<const std::string> args) {
     const std::string inode_str = args.size() > 1 ? args[1] : "";
 
     if (inode_str.empty()) {
@@ -133,7 +133,7 @@ short Command::test_inode(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::test_block(Image &img, const std::vector<std::string> &args) {
+short Command::test_block(Image &img, const std::span<const std::string> args) {
     const std::string block_str = args.size() > 1 ? args[1] : "";
 
     if (block_str.empty()) {
@@ -159,7 +159,7 @@ short Command::test_block(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::to_in(Image &img, const std::vector<std::string> &args) {
+short Command::to_in(Image &img, const std::span<const std::string> args) {
     const std::string source_path = args.size() > 1 ? args[1] : "";
     const std::string dest_path = args.size() > 2 ? args[2] : "";
 
@@ -173,7 +173,7 @@ short Command::to_in(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::to_out(Image &img, const std::vector<std::string> &args) {
+short Command::to_out(Image &img, const std::span<const std::string> args) {
     const std::string source_path = args.size() > 1 ? args[1] : "";
     const std::string dest_path = args.size() > 2 ? args[2] : "";
 
@@ -193,7 +193,7 @@ short Command::pwd(Image &img) {
     return 0;
 }
 
-short Command::touch(Image &img, const std::vector<std::string> &args) {
+short Command::touch(Image &img, const std::span<const std::string> args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if (file_path.empty()) {
@@ -243,14 +243,14 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
         .eh_depth      = 0,
         .eh_generation = 0,
     };
-  
+
     // Finalmente escrevemos na imagem
     Utils::write_to(new_inode.i_block, eh);
     img.write_inode(Wrappers::Inode(
-        new_inode_id, 
-        img.get_volume_uuid(), 
+        new_inode_id,
+        img.get_volume_uuid(),
         img.get_superblock().get_inode_size(),
-        new_inode, 
+        new_inode,
         std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0})));
 
     img.dir_add_entry(parent_dir, new_inode_id, file_name, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
@@ -262,7 +262,7 @@ short Command::touch(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::mkdir(Image &img, const std::vector<std::string> &args) {
+short Command::mkdir(Image &img, const std::span<const std::string> args) {
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
     if (dir_path.empty()) {
@@ -287,7 +287,7 @@ short Command::mkdir(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::rm(Image &img, const std::vector<std::string> &args) {
+short Command::rm(Image &img, const std::span<const std::string> args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
     if (file_path.empty()) {
@@ -321,7 +321,7 @@ short Command::rm(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::rmdir(Image &img, const std::vector<std::string> &args) {
+short Command::rmdir(Image &img, const std::span<const std::string> args) {
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
     if (dir_path.empty()) {
@@ -334,7 +334,7 @@ short Command::rmdir(Image &img, const std::vector<std::string> &args) {
     return 0;
 }
 
-short Command::rename(Image &img, const std::vector<std::string> &args) {
+short Command::rename(Image &img, const std::span<const std::string> args) {
     const std::string file = args.size() > 1 ? args[1] : "";
     const std::string new_file_name = args.size() > 2 ? args[2] : "";
 
@@ -346,7 +346,7 @@ short Command::rename(Image &img, const std::vector<std::string> &args) {
     auto [path, file_name] = Utils::split_path(file);
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
-    
+
     // Vemos se o arquivo existe.
     auto entries = img.list_dir(parent_dir);
 
