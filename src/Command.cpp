@@ -4,6 +4,13 @@
 #include <ranges>
 #include <algorithm>
 
+/**
+ * @file    Command.cpp
+ * @brief   Implementação dos comandos do projeto.
+ * 
+ * Implementação dos comandos especificados do projeto.
+ */
+
 using Ext4::Wrappers::Image;
 
 short Command::help() {
@@ -83,7 +90,7 @@ short Command::cd(Image &img, const std::span<const std::string> args) {
     // Procuramos o diretório
     auto [parent_dir, resolved_path] = img.resolve_path(target_path, img.get_current_inode());
 
-    // Checamos se não chegamos no memso diretório
+    // Checamos se não chegamos no mesmo diretório
     if (img.get_current_path().ends_with(resolved_path)) {
         std::println("Diretório alvo é o mesmo do atual.");
         return 1;
@@ -98,8 +105,10 @@ short Command::cd(Image &img, const std::span<const std::string> args) {
 
 short Command::ls(Image &img, const std::span<const std::string> args) {
     const std::string target_path = args.size() > 1 ? args[1] : img.get_current_path();
+    // Pegamos o diretório no sistema
     auto [parent_dir, _] = img.resolve_path(target_path, img.get_current_inode());
 
+    // Agora só listamos eles
     for (const auto &entry: img.list_dir(parent_dir)) {
         bool is_dir = entry.is_dir();
         std::println("{}{}{}", is_dir ? "\033[32m" : "", entry.get_name(), is_dir ? "\033[0m" : "");
@@ -189,6 +198,7 @@ short Command::to_out(Image &img, const std::span<const std::string> args) {
 
 
 short Command::pwd(Image &img) {
+    // Sempre guardamos em `img`, então é só pegar de volta a informação do diretório atual
     std::println("{}", img.get_current_path());
     return 0;
 }
@@ -201,6 +211,7 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
+    // Pegamos o diretório
     auto [path, file_name] = Utils::split_path(file_path);
 
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
@@ -228,10 +239,10 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
         .i_atime = now,
         .i_ctime = now,
         .i_mtime = now,
-        .i_links_count = 1,
-        .i_flags     = Flags::InodeFlags::EXT4_EXTENTS_FL,  // EXT4_EXTENTS_FL
+        .i_links_count = 1, // 1 hard link para ele mesmo
+        .i_flags     = Flags::InodeFlags::EXT4_EXTENTS_FL,  // EXT4_EXTENTS_FL (usamos extents)
         .i_size_hi   = 0,
-        .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize,
+        .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize, // Aqui só usamos o que o superbloco manda para evitar inconsistências
 
     };
 
@@ -251,11 +262,12 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
         img.get_volume_uuid(),
         img.get_superblock().get_inode_size(),
         new_inode,
-        std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0})));
+        std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0}))
+    );
 
     img.dir_add_entry(parent_dir, new_inode_id, file_name, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
 
-    // Modificamos o inode pai para modificar os campos "modificado"
+    // Modificamos o inode pai para modificar o campo "modificado"
     Raw::Inode parent_raw = parent_dir.get_raw();
     parent_raw.i_mtime = now;
     img.write_inode(parent_dir);
@@ -284,6 +296,8 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
+    // faça sua mágica!
+
     return 0;
 }
 
@@ -295,8 +309,9 @@ short Command::rm(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
+    // Separamos o diretório alvo do nome do arquivo
     auto [path, file_name] = Utils::split_path(file_path);
-
+    // Pegamos o diretório
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
 
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
@@ -311,11 +326,13 @@ short Command::rm(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
+    // Por favor não remova diretórios por aqui :)
     if (target->is_dir()) {
         std::println(std::cerr, "Erro: '{}' é um diretório. Use rmdir.", file_name);
         return 1;
     }
 
+    // Agora só removemos
     img.dir_remove_entry(parent_dir, file_name);
 
     return 0;
@@ -342,9 +359,9 @@ short Command::rename(Image &img, const std::span<const std::string> args) {
         std::println(std::cerr, "Uso: rename <arquivo> <novo nome do arquivo>");
         return 1;
     }
-
+    // Separamos o diretório alvo do nome do arquivo
     auto [path, file_name] = Utils::split_path(file);
-
+    // Agora pegamos o inode do diretório pai
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
 
     // Vemos se o arquivo existe.
@@ -369,6 +386,7 @@ short Command::rename(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
+    // Agora só renomeamos
     img.dir_rename_entry(parent_dir, file_name, new_file_name);
 
     return 0;

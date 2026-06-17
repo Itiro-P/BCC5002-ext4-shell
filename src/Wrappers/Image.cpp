@@ -11,6 +11,16 @@
 #include <algorithm>
 #include <tuple>
 
+/**
+ * @file    Image.cpp
+ * @brief   Implementação da classe Image — acesso ao disco EXT4.
+ * @author  Pedro Itiro Nagao
+ * @date    2025-06-16
+ *
+ * Responsável por toda I/O sobre o arquivo de imagem: leitura e escrita
+ * de blocos, inodes e descritores de grupo.
+ */
+
 using namespace Ext4;
 
 Wrappers::Image::Image(const std::string &image_path) {
@@ -549,6 +559,7 @@ uint32_t Ext4::Wrappers::Image::alloc_inode() {
                 bit_pos = j;
                 this->write_block(gds[gd_id].get_inode_bitmap_block(), full_span);
 
+                // Criamos um novo checksum do bitmap
                 if (this->super_block.has_metadata_csum())
                     new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
 
@@ -618,6 +629,7 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
                 bit_pos = j;
                 this->write_block(gds[gd_id].get_block_bitmap_block(), full_span);
 
+                // Criamos um novo checksum
                 if (this->super_block.has_metadata_csum())
                     new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
 

@@ -8,6 +8,15 @@
 #include <cstring>
 #include <print>
 
+/**
+ * @file    SuperBlock.cpp
+ * @brief   Implementação da classe SuperBlock — manipulação do superbloco
+ * @author  Pedro Itiro Nagao
+ * @date    2025-06-14
+ *
+ * Classe de conveniência para não precisar calcular manualmente bits concatenados dos campos.
+ */
+
 Ext4::Wrappers::SuperBlock::SuperBlock(const Raw::SuperBlock &raw_super_block) : raw(raw_super_block) {
     this->_is_64 = (raw.s_feature_incompat  &Flags::SuperBlockFlags::IncompatFeature::INCOMPAT_64BIT) != 0;
 }

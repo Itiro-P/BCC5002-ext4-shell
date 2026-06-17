@@ -2,6 +2,15 @@
 #include "../../include/Utils.hpp"
 #include <bitset>
 
+/**
+ * @file    GroupDescriptor.cpp
+ * @brief   Implementação da classe GroupDescriptor — manipulação dos grupos de descritores
+ * @author  Pedro Itiro Nagao
+ * @date    2025-06-04
+ *
+ * Classe de conveniência para não precisar calcular manualmente bits concatenados dos campos.
+ */
+
 uint64_t Ext4::Wrappers::GroupDescriptor::get_block_bitmap_block() const {
     return _is_64
         ? Utils::concatenate(raw.bg_block_bitmap_lo, raw.bg_block_bitmap_hi)

@@ -10,9 +10,13 @@
 #include <optional>
 
 /**
- * @brief Arquivo de cabeçalho que inclui definições e declarações de utilitários comuns usados em todo o projeto.
- * @author Pedro Itiro Nagao
+ * @file    Utils.hpp
+ * @brief   Funções utilitárias usadas no projeto.
+ * @author  Pedro Itiro Nagao
+ * @date    2025-06-14
+ *
  */
+
 namespace Utils {
     /**
      * @brief Concatena duas metades de bits (_lo e _hi) em um tipo inteiro maior de 64 bits.
