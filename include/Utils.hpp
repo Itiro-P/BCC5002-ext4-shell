@@ -2,6 +2,7 @@
 
 #include <type_traits>
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <span>
 #include <vector>
@@ -60,17 +61,26 @@ namespace Utils {
     /**
      * @brief Lê uma estrutura inteira diretamente a partir de um container de bytes.
      * @param src O container
+     * @param offset (Opcional) O offset (em bytes) para começar a escrever no container.
      * @param count (Opcional) O número de bytes que deve ser lido e copiado.
      */
     template <typename T, Container C>
-    inline constexpr T copy(const C &src, const std::optional<size_t> count = std::nullopt) {
+    inline constexpr T copy(const C &src, 
+        const std::optional<size_t> offset = std::nullopt,
+        const std::optional<size_t> count  = std::nullopt) 
+    {
+        size_t off = offset.value_or(0);
         size_t to_copy = count.value_or(sizeof(T));
 
-        if (src.size() < to_copy || sizeof(T) < to_copy)
+        if (src.size() < off + to_copy || sizeof(T) < to_copy)
             throw std::runtime_error("Erro de buffer: tamanho de cópia inválido ou dados insuficientes.");
 
         T obj{};
-        std::copy_n(std::to_address(src.data()), to_copy, reinterpret_cast<std::byte*>(&obj));
+        std::copy_n(
+            reinterpret_cast<const std::byte*>(std::to_address(src.data())) + off,
+            to_copy,
+            reinterpret_cast<std::byte*>(&obj)
+        );
         return obj;
     }
 
@@ -88,13 +98,52 @@ namespace Utils {
     }
 
     /**
+     * @brief Escreve uma estrutura em um container de bytes.
+     * @param dst Um container de destino.
+     * @param src A estrutura/objeto a ser escrita no container.
+     * @param offset (opcional) O offset (em bytes) para começar a escrever no container.
+     * @param count (opcional) Quantos bytes de src deverão ser escritos.
+     */
+    template <typename T>
+        requires (Object<T> || std::same_as<T, std::string> || std::ranges::contiguous_range<T>)
+    inline constexpr void write_to(std::span<std::byte> dst, const T &src,
+        const std::optional<size_t> offset = std::nullopt,
+        const std::optional<size_t> count  = std::nullopt)
+    {
+        size_t off = offset.value_or(0);
+
+        const std::byte* src_ptr;
+        size_t src_size;
+
+        if constexpr (std::same_as<T, std::string>) {
+            src_ptr  = reinterpret_cast<const std::byte*>(src.data());
+            src_size = src.size();
+        } else if constexpr (std::ranges::contiguous_range<T>) {
+            src_ptr  = reinterpret_cast<const std::byte*>(std::ranges::data(src));
+            src_size = std::ranges::size(src) * sizeof(std::ranges::range_value_t<T>);
+        } else {
+            src_ptr  = reinterpret_cast<const std::byte*>(&src);
+            src_size = sizeof(T);
+        }
+
+        size_t to_write = count.value_or(src_size);
+        if (off + to_write > dst.size())
+            throw std::runtime_error("Buffer insuficiente para escrever.");
+
+        std::memcpy(dst.data() + off, src_ptr, to_write);
+    }
+
+    /**
      * @brief Cria um `std::span<std::byte>` a partir de um container (será interpretado como bytes puros).
      * @param c O container.
      * @param offset (opcional) O offset (em elementos) para começar a ler do container.
      * @param count (opcional) Quantos bytes deverão ser incluidos no `std::span`.
      */
     template <Container C>
-    inline constexpr auto as_byte_span(C &&c, const std::optional<size_t> offset = std::nullopt, const std::optional<size_t> count = std::nullopt) {
+    inline constexpr auto as_byte_span(C &&c, 
+        const std::optional<size_t> offset = std::nullopt, 
+        const std::optional<size_t> count = std::nullopt
+    ) {
         using Elem = std::conditional_t<std::is_const_v<std::remove_reference_t<C>>, const std::byte, std::byte>;
         size_t available = c.size() - offset.value_or(0);
         size_t to_copy = (count && *count > 0 ? *count : available) * sizeof(typename std::remove_cvref_t<C>::value_type);
@@ -227,10 +276,13 @@ namespace Utils {
      * @param str A string alvo.
      * @returns Um `std::pair<>{diretório, arquivo}`.
      */
-    inline constexpr std::pair<std::string, std::string> split_path(const std::string &str) {
-        size_t bar = str.find_last_of("/");
-        std::string path = (bar == std::string::npos) ? "" : str.substr(0, bar);
-        std::string file_name = (bar == std::string::npos) ? str : str.substr(bar + 1);
-        return {path, file_name};
+    inline constexpr std::pair<std::string, std::string> split_path(const std::string& str) {
+        size_t bar = str.find_last_of('/');
+
+        if (bar == std::string::npos) return {"", str};
+
+        if (bar == 0) return {"/", str.substr(1)};
+
+        return {str.substr(0, bar), str.substr(bar + 1)};
     }
 };

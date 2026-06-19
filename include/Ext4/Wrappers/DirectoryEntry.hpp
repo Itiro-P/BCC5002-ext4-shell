@@ -42,10 +42,7 @@ namespace Ext4::Wrappers {
         /**
          * @brief Retorna o tipo do arquivo.
          */
-        uint8_t get_type() const {
-            return this->raw.file_type;
-        }
-
+        Raw::DirectoryFileType get_type() const { return static_cast<Raw::DirectoryFileType>(this->raw.file_type); }
         /**
          * @brief Retorna se o tipo da entrada é um diretório.
          */

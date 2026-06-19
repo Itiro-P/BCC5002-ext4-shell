@@ -3,6 +3,7 @@
 #include <charconv>
 #include <ranges>
 #include <algorithm>
+#include <cstring>
 
 /**
  * @file    Command.cpp
@@ -40,7 +41,7 @@ short Command::cat(Image &img, const std::span<const std::string> args) {
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
     // Cria a view filtrada para ver se há um arquivo aqui.
-    auto target_file = std::ranges::find_if (entries, [&](const auto &entry) {
+    auto target_file = std::ranges::find_if(entries, [&](const auto &entry) {
         return entry.get_name() == file_name;
     });
 
@@ -283,10 +284,8 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
     }
 
     auto [path, path_name] = Utils::split_path(dir_path);
-
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
 
-    // vemos se o diretório já existe
     bool path_exists = std::ranges::any_of(img.list_dir(parent_dir), [&](const Wrappers::DirectoryEntry &entry){
         return entry.get_name() == path_name;
     });
@@ -295,8 +294,6 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
         std::println("Diretório alvo existe e é um arquivo/diretório");
         return 1;
     }
-
-    // faça sua mágica!
 
     return 0;
 }
@@ -317,7 +314,7 @@ short Command::rm(Image &img, const std::span<const std::string> args) {
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
     // Vemos se o arquivo não existe mais
-    auto target = std::ranges::find_if (entries, [&](const auto &e) {
+    auto target = std::ranges::find_if(entries, [&](const auto &e) {
         return e.get_name() == file_name;
     });
 
@@ -346,7 +343,37 @@ short Command::rmdir(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
-    // necessário implementar
+    auto [path, path_name] = Utils::split_path(dir_path);
+    auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
+
+    std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
+
+    auto target = std::ranges::find_if(entries, [&](const auto &e) {
+        return e.get_name() == path_name;
+    });
+
+    if (target == entries.end()) {
+        std::println(std::cerr, "Erro: Diretório '{}' não encontrado.", path_name);
+        return 1;
+    }
+
+    if (!target->is_dir()) {
+        std::println(std::cerr, "Erro: '{}' não é um diretório. Use rm.", path_name);
+        return 1;
+    }
+
+    // Validando se o diretório está realmente vazio
+    Wrappers::Inode target_inode = img.get_inode(target->get_inode());
+    std::vector<Wrappers::DirectoryEntry> target_entries = img.list_dir(target_inode);
+    
+    // Um diretório vazio tem no máximo 2 entradas ("." e "..")
+    for (const auto &e : target_entries) {
+        if (e.get_name() != "." && e.get_name() != "..") {
+            std::println(std::cerr, "Erro: O diretório '{}' não está vazio.", path_name);
+            return 1;
+        }
+    }
+
 
     return 0;
 }
@@ -361,33 +388,28 @@ short Command::rename(Image &img, const std::span<const std::string> args) {
     }
     // Separamos o diretório alvo do nome do arquivo
     auto [path, file_name] = Utils::split_path(file);
-    // Agora pegamos o inode do diretório pai
+    // Agora pegamos o inode do diretório pai do alvo do arquivo
     auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
+    // Separamos também o diretório alvo do novo nome do arquivo
+    auto [new_path, new_name] = Utils::split_path(new_file_name);
+    // Pegamos também o diretório alvo do novo arquivo
+    auto [new_dir, new_resolved_path] = img.resolve_path(new_path, img.get_current_inode());
 
-    // Vemos se o arquivo existe.
-    auto entries = img.list_dir(parent_dir);
-
-    bool file_exists = false;
-    bool name_taken  = false;
-
-    // Aqui fazer um loop manual tende a ser mais eficiente já que estamos procurando 2 valores em si
-    for (const auto &e : entries) {
-        if (e.get_name() == file_name)    file_exists = true;
-        if (e.get_name() == new_file_name) name_taken  = true;
-        if (file_exists && name_taken) break;
-    }
-
-    if (!file_exists) {
+    // Vemos se o arquivo existe
+    auto parent_entries = img.list_dir(parent_dir);
+    if (auto file_exists = std::ranges::find_if(parent_entries, [&](const auto &entry) { return entry.get_name() == file_name; }); file_exists == parent_entries.end()) {
         std::println(std::cerr, "Erro: '{}' não encontrado.", file_name);
         return 1;
     }
-    if (name_taken) {
-        std::println(std::cerr, "Erro: '{}' já existe.", new_file_name);
+
+    // Vemos se existe o arquivo alvo
+    auto new_parent_entries = img.list_dir(new_dir);
+    if (auto file_exists = std::ranges::find_if(new_parent_entries, [&](const auto &entry) { return entry.get_name() == new_name; }); file_exists != new_parent_entries.end()) {
+        std::println(std::cerr, "Erro: '{}' já existe.", new_name);
         return 1;
     }
-
     // Agora só renomeamos
-    img.dir_rename_entry(parent_dir, file_name, new_file_name);
+    img.dir_rename_entry(parent_dir, file_name, new_dir, new_name);
 
     return 0;
 }

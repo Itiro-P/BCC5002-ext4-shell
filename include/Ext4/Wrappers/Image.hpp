@@ -267,9 +267,10 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Aloca um novo inode.
+         * @param is_dir Caso o inode alvo seja um diretório. (padrão = `false`)
          * @returns O ID do novo inode.
          */
-        uint32_t alloc_inode();
+        uint32_t alloc_inode(const bool is_dir = false);
 
         /**
          * @brief Aloca um novo bloco.
@@ -281,14 +282,16 @@ namespace Ext4::Wrappers {
          * @brief Aloca uma série contígua de blocos.
          * @param amount A quantidade de blocos para alocar.
          * @returns O ID do primeiro bloco do conjunto.
+         * @details Essa função não atualiza bg_used_dirs_count
          */
         uint32_t alloc_contiguous_blocks(const uint32_t amount);
 
         /**
          * @brief Libera um inode.
+         * @param is_dir Caso o inode alvo seja um diretório. (padrão = `false`)
          * @param ino O ID do inode.
          */
-        void free_inode(const uint32_t ino);
+        void free_inode(const uint32_t ino, const bool is_dir = false);
 
         /**
          * @brief Libera um bloco.
@@ -302,7 +305,7 @@ namespace Ext4::Wrappers {
         uint64_t entry_logical_offset(std::span<const Wrappers::DirectoryEntry> entries, size_t idx) const;
 
         /**
-         * @brief Relaciona uma um inode a outro.
+         * @brief Relaciona um inode a outro.
          * @param dir_inode O inode do diretório pai.
          * @param target_ino O ID do inode que se relacionará. 
          * @param name O nome do inode (arquivo/diretório).
@@ -327,10 +330,18 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Renomeia uma entrada de `old_name` para `new_name`.
-         * @param dir_inode O inode do diretório pai.
+         * @param dir_inode O inode do diretório pai do alvo.
          * @param old_name O nome alvo (o antigo).
+         * @param new_dir O inode do diretório pai do destino
          * @param new_name O novo nome.
          */
-        void dir_rename_entry(const Wrappers::Inode &dir_inode, const std::string &old_name, const std::string &new_name);
+        void dir_rename_entry(const Wrappers::Inode &dir_inode, const std::string &old_name, const Wrappers::Inode &new_dir, const std::string &new_name);
+
+        /**
+         * @brief Método de conveniência para trocar a entrada de '..' para a nova caso o diretório-pai mude.
+         * @param dir_inode O inode alvo.
+         * @param new_parent_ino O Id do (novo) inode pai.
+         */
+        void dir_rename_dotdot(const Wrappers::Inode &dir_inode, uint32_t new_parent_ino);
     };
 }

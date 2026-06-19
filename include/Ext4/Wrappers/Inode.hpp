@@ -60,7 +60,6 @@ namespace Ext4::Wrappers {
 
         /**
          * @brief Retorna o tamanho da estrutura lida no disco.
-         * No caso, confie mais em `Raw::Inode`
          */
         uint32_t get_struct_size() const { return this->_s_inode_size; }
 

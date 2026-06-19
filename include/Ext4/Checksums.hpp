@@ -109,6 +109,23 @@ typename Config::type crc_generic(std::span<const std::byte> data, typename Conf
  */
 namespace Ext4::Checksums {
     /**
+     * @brief Valida um checksum calculado contra o gravado, lançando exceção se divergirem.
+     * Sim, eu estava cansado de checar toda santa hora isso :)
+     * @param recorded  O checksum gravado na estrutura.
+     * @param calc O checksum calculado.
+     * @param context Mensagem de contexto para o erro (ex: "inode 26", "grupo 2").
+     * @throws `std::logic_error` caso o checksum seja inválido (`calculado != gravado`)
+     */
+    template <std::unsigned_integral T>
+    inline void validate_checksum(const T recorded, const T calc, const std::string_view context) {
+        if (recorded != calc)
+            throw std::logic_error(std::format(
+                "Checksum de {} inválido.\nGravado: 0x{:08x}; Calculado: 0x{:08x}",
+                context, recorded, calc
+            ));
+    }
+
+    /**
      * @brief Calcula o CRC16 do vetor de bytes fornecido (Refletido)
      * @param data Um vetor de bytes para leitura dos dados.
      * @param seed A semente usada no CRC (padrão = 0xFFFF).
