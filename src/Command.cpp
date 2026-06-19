@@ -1,9 +1,11 @@
 #include "../include/Command.hpp"
 #include <iostream>
+#include <fstream>
 #include <charconv>
 #include <ranges>
 #include <algorithm>
 #include <cstring>
+#include <sstream>
 
 /**
  * @file    Command.cpp
@@ -174,11 +176,81 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
     const std::string dest_path = args.size() > 2 ? args[2] : "";
 
     if (source_path.empty() || dest_path.empty()) {
-        std::println(std::cerr, "Uso: import <arquivo do SO> <diretório da imagem>");
+        std::println(std::cerr, "Uso: import <arquivo do SO> <diretório na imagem>");
         return 1;
     }
 
-    // necessário implementar
+    // Vemos se o arquivo alvo já existe na imagem. Só ver o nome é só suficiente, certo? :)
+    auto [dst_path, dst_file] = Utils::split_path(dest_path);
+    auto [dst_inode, dst_resolved_path] = img.resolve_path(dst_path, img.get_root_inode());
+    if(std::ranges::any_of(img.list_dir(dst_inode), 
+        [&](const auto &entry) {return entry.get_name() == dst_file;})) {
+        std::println("Arquivo alvo {} já existe na imagem.", dst_file);
+        return 1;
+    }
+
+    // Abrimos o arquivo do SO para transferir como binário
+    std::ifstream src_file_stream(source_path, std::ios::binary | std::ios::ate);
+    if(!src_file_stream.is_open()) {
+        std::println("Não foi possível abrir o arquivo alvo.");
+        return 1;    
+    }
+
+    // Pegamos o tamanho do arquivo
+    uint64_t file_size = static_cast<uint64_t>(src_file_stream.tellg());
+    // Movemos o cursor para o início e (finalmente) lemos o buffer
+    src_file_stream.seekg(0, std::ios::beg);
+    // Lemos o arquivo em um buffer
+    std::stringstream buffer;
+    buffer << src_file_stream.rdbuf();
+
+    // Alocamos um inode e criamos a estrutura para escrita
+    uint32_t new_inode_id = img.alloc_inode();
+    uint32_t now = static_cast<uint32_t>(std::time(nullptr));
+    
+    // Inicializa o inode
+    Raw::Inode new_inode{
+        .i_mode      = Flags::InodeMode::S_IFREG | 0644,  // arquivo regular + permissões 644
+        // Timestamps
+        .i_atime = now,
+        .i_ctime = now,
+        .i_mtime = now,
+        .i_links_count = 1, // 1 hard link para ele mesmo
+        .i_flags = Flags::InodeFlags::EXT4_EXTENTS_FL,  // EXT4_EXTENTS_FL (usamos extents)
+        .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize, // Aqui só usamos o que o superbloco manda para evitar inconsistências
+
+    };
+    // Colocamos o tamanho do arquivo
+    Utils::split(file_size, new_inode.i_size_lo, new_inode.i_size_hi);
+    uint32_t block_size = img.get_superblock().get_block_size();
+    // Quantos blocos precisamos para o arquivo (truque de inteiros aqui)
+    uint32_t size_blocks = (file_size + block_size - 1) / block_size;
+    // Inicializa extent header dentro do i_block
+    Raw::ExtentHeader eh{
+        .eh_magic      = Constants::EXTENT_MAGIC,
+        .eh_entries    = 0,
+        .eh_max        = 4, // cabe 4 extents diretos no i_block
+        .eh_depth      = 0,
+        .eh_generation = 0,
+    };
+
+    // Finalmente escrevemos na imagem
+    Utils::write_to(new_inode.i_block, eh);
+    img.write_inode(Wrappers::Inode(
+        new_inode_id,
+        img.get_volume_uuid(),
+        img.get_superblock().get_inode_size(),
+        new_inode,
+        std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0}))
+    );
+
+    img.dir_add_entry(dst_inode, new_inode_id, dst_file, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
+
+    // Modificamos o inode pai para modificar o campo "modificado"
+    Raw::Inode dst_raw = dst_inode.get_raw();
+    dst_raw.i_mtime = now;
+    dst_inode.set_raw(dst_raw);
+    img.write_inode(dst_inode);
 
     return 0;
 }
@@ -188,7 +260,7 @@ short Command::to_out(Image &img, const std::span<const std::string> args) {
     const std::string dest_path = args.size() > 2 ? args[2] : "";
 
     if (source_path.empty() || dest_path.empty()) {
-        std::println(std::cerr, "Uso: export <arquivo da imagem> <diretório do SO>");
+        std::println(std::cerr, "Uso: export <arquivo da imagem> <diretório no SO>");
         return 1;
     }
 
@@ -271,6 +343,7 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
     // Modificamos o inode pai para modificar o campo "modificado"
     Raw::Inode parent_raw = parent_dir.get_raw();
     parent_raw.i_mtime = now;
+    parent_dir.set_raw(parent_raw);
     img.write_inode(parent_dir);
     return 0;
 }
