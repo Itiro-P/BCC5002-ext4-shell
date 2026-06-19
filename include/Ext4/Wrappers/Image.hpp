@@ -279,12 +279,12 @@ namespace Ext4::Wrappers {
         uint32_t alloc_block();
 
         /**
-         * @brief Aloca uma série contígua de blocos.
+         * @brief Aloca uma série contígua de blocos. Essa função tenta alocar o máximo possível até que chegue em `amount` e retorna.
          * @param amount A quantidade de blocos para alocar.
-         * @returns O ID do primeiro bloco do conjunto.
+         * @returns A quantidade de blocos alocados e o ID do primeiro bloco do conjunto.
          * @details Essa função não atualiza bg_used_dirs_count
          */
-        uint32_t alloc_contiguous_blocks(const uint32_t amount);
+        std::pair<uint32_t, uint32_t> alloc_contiguous_blocks(const uint32_t amount);
 
         /**
          * @brief Libera um inode.
