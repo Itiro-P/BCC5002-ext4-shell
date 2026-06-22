@@ -25,7 +25,7 @@ namespace Ext4::Raw {
      * Utilizado estritamente quando `eh_depth > 0`. Aponta para um bloco de metadados descendente na árvore.
      */
     struct ExtentIndex {
-        uint32_t ei_block;   // O maior número de bloco lógico (offset no ficheiro) que este nó indexa.
+        uint32_t ei_block;   // Índice cobre os blocos lógicos a partir deste.
         uint32_t ei_leaf_lo; // Os 32 bits inferiores do número do bloco físico do nó filho em disco.
         uint16_t ei_leaf_hi; // Os 16 bits superiores do número do bloco físico do nó filho em disco (Suporte 64-bits).
         uint16_t ei_unused;  // Bytes de alinhamento nulo (Padding).

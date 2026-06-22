@@ -547,6 +547,11 @@ uint32_t Ext4::Wrappers::Image::alloc_inode(const bool is_dir) {
     // Procuramos pelo primeiro grupo de descritores que contém 1 bit desativado em seu bitmap
     for (size_t i = 0; i < gds.size(); i++) {
         if (stop) break;
+        if (gds[i].is_inode_uninit()) {
+            // O bitmap de inodes deste grupo não está inicializado no disco.
+            // Pule para evitar erro de checksum.
+            continue; 
+        }
 
         std::vector<std::byte> inode_bitmap(this->super_block.get_block_size());
         std::span<std::byte> full_span = Utils::as_byte_span(inode_bitmap); // bloco inteiro para leitura
@@ -624,6 +629,11 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
     // Procuramos pelo primeiro grupo de descritores que contém 1 bit desativado em seu bitmap
     for (size_t i = 0; i < gds.size(); i++) {
         if (stop) break;
+        if (gds[i].is_block_uninit()) {
+            // O bitmap de inodes deste grupo não está inicializado no disco.
+            // Pule para evitar erro de checksum.
+            continue; 
+        }
 
         std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
         auto full_span = Utils::as_byte_span(block_bitmap);
@@ -685,20 +695,26 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
 }
 
 std::pair<uint32_t, uint32_t> Ext4::Wrappers::Image::alloc_contiguous_blocks(const uint32_t amount) {
-    bool stop = false;
     std::vector<Wrappers::GroupDescriptor> &gds = this->group_descriptors;
-    uint32_t gd_id = 0, bit_pos = 0;
-    uint32_t found_amount = 0;  // quantidade real conseguida
-    uint32_t new_bitmap_csum = 0;
+    
+    // Variáveis para rastrear o melhor lugar encontrado globalmente
+    int best_gd_id = -1;
+    size_t global_best_start = 0;
+    uint32_t global_best_len = 0;
 
-    // Percorremos todos os grupos de descritores para encontrar a maior quantidade contígua
-    for (size_t i = 0; i < gds.size() && !stop; i++) {
+    // Busca o melhor grupo
+    for (size_t i = 0; i < gds.size(); i++) {
+        if (gds[i].is_block_uninit()) {
+            // O bitmap de inodes deste grupo não está inicializado no disco.
+            // Pule para evitar erro de checksum.
+            continue; 
+        }
         std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
         auto full_span = Utils::as_byte_span(block_bitmap);
         this->read_block(gds[i].get_block_bitmap_block(), full_span);
         auto bitmap_span = full_span.subspan(0, this->super_block.get_blocks_per_group() / 8);
 
-        // Checagem de checksums
+        // Checagem de checksums do bitmap que lemos
         if (this->super_block.has_metadata_csum()) {
             Checksums::validate_checksum(
                 gds[i].get_block_bitmap_checksum(),
@@ -716,60 +732,74 @@ std::pair<uint32_t, uint32_t> Ext4::Wrappers::Image::alloc_contiguous_blocks(con
                 if (run_len == 0) run_start = j;
                 run_len++;
 
-                // Já achou o suficiente — pode parar de procurar
                 if (run_len >= amount) {
                     best_start = run_start;
-                    best_len = amount;  // não precisa de mais que o pedido
-                    break;
+                    best_len = amount;
+                    break; // Achou o ideal neste grupo!
                 }
-                // Atualiza o melhor visto até agora (caso não ache 'amount' completo)
                 if (run_len > best_len) {
                     best_start = run_start;
                     best_len = run_len;
                 }
             } else {
-                run_len = 0;  // sequência quebrou
+                run_len = 0;
             }
         }
 
-        if (best_len == 0) continue;  // esse grupo não tem nenhum bloco livre
+        // Compara com o melhor global
+        if (best_len > global_best_len) {
+            global_best_len = best_len;
+            global_best_start = best_start;
+            best_gd_id = i;
 
-        // Aloca a melhor sequência encontrada neste grupo
-        for (size_t k = best_start; k < best_start + best_len; ++k)
-            Utils::set_bit(bitmap_span, k, 1);
-
-        this->write_block(gds[i].get_block_bitmap_block(), full_span);
-        if (this->super_block.has_metadata_csum())
-            new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
-
-        gd_id = i;
-        bit_pos = best_start;
-        found_amount = best_len;
-        stop = true;  // achou algo neste grupo — para a busca
+            // Se achou exatamente a quantidade que pediu, não precisa testar os próximos grupos
+            if (global_best_len == amount) {
+                break;
+            }
+        }
     }
 
-    if (found_amount == 0) throw std::runtime_error("Sem espaço: nenhum bloco livre disponível.");
+    if (global_best_len == 0 || best_gd_id == -1) {
+        throw std::runtime_error("Sem espaço: nenhum bloco livre disponível em toda a imagem.");
+    }
 
-    // Atualiza estruturas relacionadas
-    Wrappers::GroupDescriptor to_change = gds[gd_id];
+    // Aloca de fato no melhor grupo (best_gd_id)
+    std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
+    auto full_span = Utils::as_byte_span(block_bitmap);
+    this->read_block(gds[best_gd_id].get_block_bitmap_block(), full_span);
+    auto bitmap_span = full_span.subspan(0, this->super_block.get_blocks_per_group() / 8);
+
+    for (size_t k = global_best_start; k < global_best_start + global_best_len; ++k) {
+        Utils::set_bit(bitmap_span, k, 1);
+    }
+
+    this->write_block(gds[best_gd_id].get_block_bitmap_block(), full_span);
+
+    // Atualizando metadados e checksums
+    Wrappers::GroupDescriptor to_change = gds[best_gd_id];
     Raw::GroupDescriptor new_raw = to_change.get_raw();
-    if (this->super_block.has_metadata_csum())
-        Utils::split(new_bitmap_csum, new_raw.bg_block_bitmap_csum_lo, new_raw.bg_block_bitmap_csum_hi);
 
-    uint32_t new_block_count = to_change.get_free_blocks_count() - found_amount;
+    if (this->super_block.has_metadata_csum()) {
+        uint32_t new_bitmap_csum = Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed());
+        Utils::split(new_bitmap_csum, new_raw.bg_block_bitmap_csum_lo, new_raw.bg_block_bitmap_csum_hi);
+    }
+
+    uint32_t new_block_count = to_change.get_free_blocks_count() - global_best_len;
     Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
     to_change.set_raw(new_raw);
     this->write_gdt(to_change);
 
     Raw::SuperBlock sb_raw = this->super_block.get_raw();
-    uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi) - found_amount;
+    uint64_t global_free_blocks = Utils::concatenate(sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi) - global_best_len;
     Utils::split(global_free_blocks, sb_raw.s_free_blocks_count_lo, sb_raw.s_free_blocks_count_hi);
+
     this->write_superblock(Wrappers::SuperBlock(sb_raw));
 
+    // Cálculo do bloco lógico inicial
     uint32_t first_data_block = this->super_block.get_first_data_block();
-    uint32_t first_block = (gd_id * this->super_block.get_blocks_per_group()) + bit_pos + first_data_block;
+    uint32_t first_block = (best_gd_id * this->super_block.get_blocks_per_group()) + global_best_start + first_data_block;
 
-    return {found_amount, first_block};
+    return {global_best_len, first_block};
 }
 
 void Ext4::Wrappers::Image::free_inode(const uint32_t ino, const bool is_dir) {
