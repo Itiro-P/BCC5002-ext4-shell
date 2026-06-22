@@ -433,8 +433,8 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
             // Monta o índice para colocar na raiz (i_block)
             Raw::ExtentIndex idx{
                 .ei_block = child_leafs[0].ee_block,
-                .ei_leaf_lo = static_cast<uint32_t>(child_blk & std::numeric_limits<uint32_t>().max()),
-                .ei_leaf_hi = static_cast<uint16_t>((child_blk >> 32) & std::numeric_limits<uint16_t>().max()),
+                .ei_leaf_lo = static_cast<uint32_t>(child_blk & MAX_32BIT),
+                .ei_leaf_hi = static_cast<uint16_t>((child_blk >> 32) & MAX_16BIT),
             };
             root_indices.push_back(idx);
             leaf_offset += chunk_size;
