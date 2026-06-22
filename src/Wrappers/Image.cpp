@@ -724,8 +724,8 @@ std::pair<uint32_t, uint32_t> Ext4::Wrappers::Image::alloc_contiguous_blocks(con
         }
 
         size_t total_bits = bitmap_span.size() * 8;
-        size_t best_start = 0, best_len = 0;
-        size_t run_start = 0, run_len = 0;
+        size_t best_start = 0, best_len = 0;  // melhor sequência encontrada neste grupo
+        size_t run_start = 0, run_len = 0;    // sequência atual sendo contada
 
         for (size_t j = 0; j < total_bits; ++j) {
             if (!Utils::test_bit(bitmap_span, j)) {
@@ -786,7 +786,6 @@ std::pair<uint32_t, uint32_t> Ext4::Wrappers::Image::alloc_contiguous_blocks(con
 
     uint32_t new_block_count = to_change.get_free_blocks_count() - global_best_len;
     Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
-
     to_change.set_raw(new_raw);
     this->write_gdt(to_change);
 
