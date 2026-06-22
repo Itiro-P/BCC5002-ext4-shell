@@ -5,6 +5,7 @@
 #include <ranges>
 #include <algorithm>
 #include <cstring>
+#include <cmath>
 
 /**
  * @file    Command.cpp
@@ -18,11 +19,110 @@ using Ext4::Wrappers::Image;
 /**
  * @brief Predicado de conveniência para ver se a entrada do diretório existe com tal nome.
  */
-auto by_name = [](const std::string &name) {
+constexpr auto by_name = [](const std::string &name) {
     return [&name](const Wrappers::DirectoryEntry &entry) {
         return entry.get_name() == name;
     };
 };
+
+/**
+ * @brief Função recursiva que cria uma árvore de extents caso a profundidade seja maior que 1.
+ * @returns O ID do bloco alocado para o nível.
+ * @author Pedro Itiro Nagao
+ */
+uint32_t build_extent_tree(
+    Wrappers::Image &img,
+    Wrappers::Inode &inode,
+    const bool has_metadata_csum,
+    const uint16_t max_entries,
+    const uint16_t max_per_block,
+    const uint16_t depth,
+    std::span<std::byte> block_bytes,
+    std::span<Raw::ExtentLeaf> leafs
+) {
+    uint32_t blk_id = img.alloc_block();
+    uint32_t block_size = img.get_superblock().get_block_size();
+    std::vector<std::byte> buf(block_size);
+    std::span<std::byte> buf_bytes = Utils::as_byte_span(buf);
+    // O cabeçalho já começa com o que é comum entre os dois
+    Raw::ExtentHeader header{
+        .eh_magic = Constants::EXTENT_MAGIC,
+        .eh_max = max_entries,
+    };
+    // Caso base
+    if(depth <= 0) {
+        header.eh_depth = 0;
+        header.eh_entries = static_cast<uint16_t>(leafs.size());
+        // Escrevemos o cabeçalho
+        Utils::write_to(buf_bytes, header);
+        // Agora (finalmente) escrevemos as folhas e seus conteúdos
+        for(size_t i = 0; i < leafs.size(); ++i) {
+            // Escrevemos a folha em si
+            Utils::write_to(buf_bytes, leafs[i], sizeof(header) + (i * sizeof(leafs[i])));
+            // Agora escrevemos os dados da folha
+            for(uint16_t j = 0; j < leafs[i].ee_len; ++j) {
+                // Calcula a posição exata deste bloco dentro do arquivo global
+                size_t file_offset = static_cast<size_t>(leafs[i].ee_block + j) * block_size;
+                img.write_block(leafs[i].get_start_block() + j, block_bytes.subspan(file_offset, block_size));
+            }
+        }
+        // Agora (finalmente) escrevemos o bloco com as folhas
+        img.write_block(blk_id, buf_bytes);
+    } else {
+        // Aqui chamamos o caso recursivo com depth-1
+        // Precisamos saber quantas folhas colocamos no nível.
+        // Em um nível n temos max_per_block^depth
+        uint32_t leafs_per_child = std::pow(max_per_block, depth);
+        std::vector<Raw::ExtentIndex> index_entries{};
+        size_t leaf_offset = 0;
+
+        while (leaf_offset < leafs.size() && index_entries.size() < max_entries) {
+            // Pega o pedaço de folhas que vai pertencer a este filho
+            size_t chunk_size = std::min(leafs_per_child, static_cast<uint32_t>(leafs.size() - leaf_offset));
+            std::span<Raw::ExtentLeaf> child_leafs = leafs.subspan(leaf_offset, chunk_size);
+
+            // Chamada recursiva: o filho constrói a subárvore dele e nos devolve o bloco físico onde ele se salvou
+            // Note que o filho (child) NÃO estará na raiz do Inode, então o max_entries dele será 'max_per_block' (um número bem maior)
+            uint32_t child_phys_block = build_extent_tree(
+                img, inode, has_metadata_csum, 
+                max_per_block, max_per_block, 
+                depth - 1, block_bytes, child_leafs
+            );
+
+            // Criamos o índice apontando para esse filho
+            Raw::ExtentIndex idx{
+                .ei_block = child_leafs[0].ee_block,
+                .ei_leaf_lo = static_cast<uint32_t>(child_phys_block & MAX_32BIT),
+                .ei_leaf_hi = static_cast<uint16_t>((child_phys_block >> 32) & MAX_16BIT),
+            };
+            index_entries.push_back(idx);
+
+            leaf_offset += chunk_size;
+        }
+
+        // Agora montamos o cabeçalho deste bloco de índice e escrevemos no buffer
+        header.eh_entries = static_cast<uint16_t>(index_entries.size());
+        header.eh_max = max_entries;
+        header.eh_depth = depth;
+        Utils::write_to(buf_bytes, header);
+
+        // Escrevemos os índices gerados no buffer
+        for (size_t i = 0; i < index_entries.size(); ++i) {
+            Utils::write_to(buf_bytes, index_entries[i], sizeof(header) + (i * sizeof(Raw::ExtentIndex)));
+        }
+
+        // Caso tenhamos checksums
+        if(has_metadata_csum) {
+            Raw::ExtentTail tail{
+                .eb_checksum = Checksums::checksum_extent(inode, buf_bytes, block_size, img.get_superblock().get_checksum_seed())
+            };
+            Utils::write_to(buf_bytes, tail, buf_bytes.size() - sizeof(tail));
+        }
+        
+        img.write_block(blk_id, buf_bytes);
+    }
+    return blk_id;
+}
 
 short Command::help() {
     for (const auto &[cmd, desc] : Command::command_info) {
@@ -201,9 +301,21 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
 
     // Pegamos o tamanho do arquivo
     uint64_t file_size = static_cast<uint64_t>(src_file_stream.tellg());
+    // Tentamos alocar blocos e criar a árvore de extents
+    uint32_t block_size = img.get_superblock().get_block_size();
+    // Quantos blocos precisamos para o arquivo (truque de inteiros aqui)
+    uint64_t blocks_needed = (file_size + block_size - 1) / block_size;
+    
+    // Caso aconteça de um arquivo muito grande ser importado: não queremos isso :)
+    if(uint64_t free_blocks = img.get_superblock().get_free_blocks_count(); free_blocks < blocks_needed) {
+        std::println("O arquivo alvo é muito grande para ser importado");
+        std::println(" - Número de blocos necessários: {}", blocks_needed);
+        std::println(" - Números de blocos livres: {}", free_blocks);
+        return 1;
+    }
+    
     // Movemos o cursor para o início e (finalmente) lemos o buffer
     src_file_stream.seekg(0, std::ios::beg);
-    // Lemos o arquivo em um buffer
     std::vector<std::byte> buffer(file_size);
     src_file_stream.read(reinterpret_cast<char*>(buffer.data()), file_size);
 
@@ -220,127 +332,131 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
         .i_mtime = now,
         .i_links_count = 1, // 1 hard link para ele mesmo
         .i_flags = Flags::InodeFlags::EXT4_EXTENTS_FL,  // EXT4_EXTENTS_FL (usamos extents)
-        .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize, // Aqui só usamos o que o superbloco manda para evitar inconsistências
-
+        // Aqui só usamos o que o superbloco manda para evitar inconsistências
+        .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize,
     };
     // Colocamos o tamanho do arquivo
     Utils::split(file_size, new_inode.i_size_lo, new_inode.i_size_hi);
+    // O contador i_blocks conta com setores de 512 bytes. Então atualizamos ele.
+    uint64_t total_sectors = blocks_needed * (block_size / 512);
+    new_inode.i_blocks_lo = static_cast<uint32_t>(total_sectors & MAX_32BIT);
+    new_inode.i_osd2.l_i_blocks_high = static_cast<uint16_t>((total_sectors >> 32) & MAX_16BIT);
 
-    // Tentamos alocar blocos e criar a árvore de extents
-    uint32_t block_size = img.get_superblock().get_block_size();
-    // Quantos blocos precisamos para o arquivo (truque de inteiros aqui)
-    uint32_t blocks_needed = (file_size + block_size - 1) / block_size;
-    std::vector<Raw::ExtentLeaf> leafs;
-    uint32_t logical = 0;
-    uint32_t remaining = blocks_needed;
+    std::vector<Raw::ExtentLeaf> leafs{};
+    std::span<Raw::ExtentLeaf> leafs_span = Utils::as_span<Raw::ExtentLeaf>(leafs);
+    uint32_t logical = 0, remaining = blocks_needed;
 
+    // Tentamos alocar blocos até não precisarmos mais e colocamos em folhas
     while(remaining > 0) {
-        auto [got, start] = img.alloc_contiguous_blocks(remaining);
+        auto [allocated_blocks, start_block] = img.alloc_contiguous_blocks(remaining);
 
         Raw::ExtentLeaf leaf{};
         leaf.ee_block = logical;
-        leaf.ee_len = got;
-        leaf.ee_start_lo = start;
+        leaf.ee_len = allocated_blocks;
+        leaf.ee_start_lo = start_block;
+        // Apostarei que nunca usaremos esse bits :)
         leaf.ee_start_hi = 0;
 
         leafs.push_back(leaf);
-        logical += got;
-        remaining -= got;
+        logical += allocated_blocks;
+        remaining -= allocated_blocks;
     }
 
+    Wrappers::Inode new_wrapper(
+        new_inode_id,
+        img.get_volume_uuid(),
+        img.get_superblock().get_inode_size(),
+        new_inode,
+        std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0})
+    );
+
+    // Agora distribuímos as folhas em extents
+
+    // Quantos extents conseguimos colocar no `i_block`
+    uint16_t max_inline = (sizeof(Raw::Inode::i_block) - sizeof(Raw::ExtentHeader)) / sizeof(Raw::ExtentLeaf);
     // Dá para alocar tudo no i_block
+    // Esse é o nosso caso feliz :D
     if(leafs.size() <= 4) {
         // Inicializa extent header dentro do i_block
         Raw::ExtentHeader extent_header{
             .eh_magic      = Constants::EXTENT_MAGIC,
             .eh_entries    = static_cast<uint16_t>(leafs.size()),
-            .eh_max        = 4, // cabe 4 extents diretos no i_block
-            .eh_depth      = 0,
-            .eh_generation = 0,
+            .eh_max        = max_inline,
+            .eh_depth      = 0, // Só temos folhas diretas aqui
         };
         // Escrevemos na imagem
         Utils::write_to(new_inode.i_block, extent_header);
+        // Onde estamos lendo do arquivo
         size_t file_offset = 0;
-        for(int i = 0; i < leafs.size(); ++i) {
-            for(int j = 0; j < leafs[i].ee_len; ++j) {
+        for(size_t i = 0; i < leafs.size(); ++i) {
+            for(uint16_t j = 0; j < leafs[i].ee_len; ++j) {
+                // Escrevemos partes do arquivo nos blocos
                 img.write_block(leafs[i].get_start_block() + j, Utils::as_byte_span(buffer, file_offset, block_size));
                 file_offset += block_size;
             }
-            Utils::write_to(new_inode.i_block, leafs[i], sizeof(extent_header) + (sizeof(Raw::ExtentLeaf) * i));
+            // Colocamos os dados no offset certo
+            Utils::write_to(new_inode.i_block, leafs[i], sizeof(extent_header) + (sizeof(leafs[i]) * i));
         }
+        // Não há necessidade de checksums aqui pois o `i_block` já é coberto pelo checksum do inode
     } else {
-        // Aqui fodeu: precisamos fazer uma árvore de extents
-        // Quantos leafs cabem por bloco de índice
-        size_t leafs_per_block = (block_size - sizeof(Raw::ExtentTail)) / sizeof(Raw::ExtentLeaf) - 1; // -1 para o header
-        size_t indexes_needed  = (leafs.size() + leafs_per_block - 1) / leafs_per_block;
+        // Aqui fodeu, precisamos criar uma árvore de extents DO ZERO
+        bool has_metadata_csum = img.get_superblock().has_metadata_csum();
+        uint16_t max_per_block = (block_size - sizeof(Raw::ExtentHeader) - (has_metadata_csum ? sizeof(Raw::ExtentTail) : 0)) / sizeof(Raw::ExtentIndex);
+        // Agora que sabemos quantos ExtentIndex/Leaf podemos colocar em um bloco, precisamos desobrir quantos blocos precisamos alocar para os ExtentIndex
+        // Para cada nível da árvore temos (max_inline *  max_indexes_per_block^n) onde n é a profundidade.
+        // Fazendo manipulação matemática e sabendo que a única coisa que importa aqui é quanto o último nível pode guardar, temos:
+        // n = log(folhas/max_inline) / log(max_indexes_per_block)
+        // Com isso, podemos fazer recursão onde o caso base ocorre quanto depth == 0
+        // Eu realmente espero que isso seja mais rápido que usar loops
+        uint16_t depth = static_cast<uint16_t>(
+            std::ceil(std::log(static_cast<double>(leafs.size()) / max_inline) / 
+            std::log(static_cast<double>(max_per_block)))
+        );
 
-        // Aloca blocos para os nós de índice
-        std::vector<uint32_t> index_blocks;
-        for (size_t i = 0; i < indexes_needed; ++i) index_blocks.push_back(img.alloc_block());
+        // Quantas folhas cada filho direto da raiz consegue gerenciar abaixo dele
+        uint32_t leafs_per_root_child = std::pow(max_per_block, depth);
+        std::vector<Raw::ExtentIndex> root_indices{};
+        size_t leaf_offset = 0;
 
-        // Escreve cada bloco de índice com seus leafs
-        for (size_t i = 0; i < indexes_needed; ++i) {
-            size_t leaf_start = i * leafs_per_block;
-            size_t leaf_end = std::min(leaf_start + leafs_per_block, leafs.size());
-            std::vector<Raw::ExtentLeaf> block_leafs(leafs.begin() + leaf_start, leafs.begin() + leaf_end);
+        // O loop da raiz roda até processar todas as folhas ou encher o espaço inline do Inode (max_inline = 4)
+        while (leaf_offset < leafs.size() && root_indices.size() < max_inline) {
+            size_t chunk_size = std::min(static_cast<size_t>(leafs_per_root_child), leafs.size() - leaf_offset);
+            std::span<Raw::ExtentLeaf> child_leafs = leafs_span.subspan(leaf_offset, chunk_size);
 
-            Raw::ExtentHeader child_header{
-                .eh_magic = Constants::EXTENT_MAGIC,
-                .eh_entries = static_cast<uint16_t>(block_leafs.size()),
-                .eh_max = static_cast<uint16_t>(leafs_per_block),
-                .eh_depth = 0,
-                .eh_generation = 0,
+            // Chamamos a recursão para os blocos externos (passando max_per_block como capacidade)
+            uint32_t child_blk = build_extent_tree(
+                img, new_wrapper, has_metadata_csum, 
+                max_per_block, max_per_block, 
+                depth - 1, Utils::as_byte_span(buffer), child_leafs
+            );
+
+            // Monta o índice para colocar na raiz (i_block)
+            Raw::ExtentIndex idx{
+                .ei_block = child_leafs[0].ee_block,
+                .ei_leaf_lo = static_cast<uint32_t>(child_blk & std::numeric_limits<uint32_t>().max()),
+                .ei_leaf_hi = static_cast<uint16_t>((child_blk >> 32) & std::numeric_limits<uint16_t>().max()),
             };
-
-            std::vector<std::byte> index_block_buf(block_size, std::byte{0});
-            Utils::write_to(Utils::as_byte_span(index_block_buf), child_header);
-            for (size_t j = 0; j < block_leafs.size(); ++j)
-                Utils::write_to(Utils::as_byte_span(index_block_buf), block_leafs[j],
-                    sizeof(Raw::ExtentHeader) + j * sizeof(Raw::ExtentLeaf));
-
-            // Tail de checksum
-            if (Wrappers::SuperBlock sb = img.get_superblock(); sb.has_metadata_csum()) {
-                // inode ainda não está no disco, então construímos o wrapper temporário
-                Wrappers::Inode temp(new_inode_id, img.get_volume_uuid(), 
-                    sb.get_inode_size(), new_inode,
-                    std::vector<std::byte>(sb.get_inode_size() - sizeof(Raw::Inode), std::byte{0}));
-                Raw::ExtentTail tail{
-                    .eb_checksum = Checksums::checksum_extent(
-                        temp, Utils::as_byte_span(index_block_buf), 
-                        block_size, sb.get_checksum_seed())
-                };
-                Utils::write_to(Utils::as_byte_span(index_block_buf), tail, block_size - sizeof(Raw::ExtentTail));
-            }
-            img.write_block(index_blocks[i], Utils::as_byte_span(index_block_buf));
+            root_indices.push_back(idx);
+            leaf_offset += chunk_size;
         }
 
-        // Monta o i_block com os ExtentIndex apontando para os blocos de índice
+        // Inicializa o ExtentHeader da raiz DIRETO no i_block do Inode
         Raw::ExtentHeader root_header{
             .eh_magic   = Constants::EXTENT_MAGIC,
-            .eh_entries = static_cast<uint16_t>(indexes_needed),
-            .eh_max     = 4,
-            .eh_depth   = 1,
-            .eh_generation = 0,
+            .eh_entries = static_cast<uint16_t>(root_indices.size()),
+            .eh_max     = max_inline, // Na raiz o limite estrito é max_inline (4)
+            .eh_depth   = depth,      // Altura total da árvore
         };
+
+        // Copia o cabeçalho e os índices gerados para dentro da estrutura i_block do Inode
         Utils::write_to(new_inode.i_block, root_header);
-        for (size_t i = 0; i < indexes_needed; i++) {
-            Raw::ExtentIndex idx{
-                .ei_block   = static_cast<uint32_t>(i * leafs_per_block), // primeiro bloco lógico coberto
-                .ei_leaf_lo = index_blocks[i],
-                .ei_leaf_hi = 0,
-                .ei_unused  = 0,
-            };
-            Utils::write_to(new_inode.i_block, idx, sizeof(Raw::ExtentHeader) + i * sizeof(Raw::ExtentIndex));
+        for (size_t i = 0; i < root_indices.size(); ++i) {
+            Utils::write_to(new_inode.i_block, root_indices[i], sizeof(root_header) + (i * sizeof(Raw::ExtentIndex)));
         }
     }
-
-    img.write_inode(Wrappers::Inode(
-        new_inode_id,
-        img.get_volume_uuid(),
-        img.get_superblock().get_inode_size(),
-        new_inode,
-        std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0}))
-    );
+    // Sincroniza o wrapper com o raw inode modificado antes de salvar no disco
+    new_wrapper.set_raw(new_inode);
+    img.write_inode(new_wrapper);
 
     img.dir_add_entry(dst_inode, new_inode_id, dst_file, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
 
@@ -443,12 +559,12 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
         .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize, // Aqui só usamos o que o superbloco manda para evitar inconsistências
 
     };
-
+    uint16_t max_inline = (sizeof(Raw::Inode::i_block) - sizeof(Raw::ExtentHeader)) / sizeof(Raw::ExtentLeaf);
     // Inicializa extent header dentro do i_block
     Raw::ExtentHeader eh{
         .eh_magic      = Constants::EXTENT_MAGIC,
         .eh_entries    = 0,
-        .eh_max        = 4, // cabe 4 extents diretos no i_block
+        .eh_max        = max_inline,
         .eh_depth      = 0,
         .eh_generation = 0,
     };
