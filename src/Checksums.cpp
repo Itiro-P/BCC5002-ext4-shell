@@ -5,7 +5,7 @@
  * @file    Checksums.cpp
  * @brief   Implementação de checksums usados no EXT4
  * @author  Pedro Itiro Nagao
- * @date    2025-06-14
+ * @date    2026-06-14
  *
  * Funções de checksum (metadados e CRC16 para os grupos de descritores) para cálculo rápido
  */

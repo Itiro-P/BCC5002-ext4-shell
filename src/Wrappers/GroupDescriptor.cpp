@@ -6,7 +6,7 @@
  * @file    GroupDescriptor.cpp
  * @brief   Implementação da classe GroupDescriptor — manipulação dos grupos de descritores
  * @author  Pedro Itiro Nagao
- * @date    2025-06-04
+ * @date    2026-06-04
  *
  * Classe de conveniência para não precisar calcular manualmente bits concatenados dos campos.
  */

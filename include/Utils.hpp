@@ -14,7 +14,7 @@
  * @file    Utils.hpp
  * @brief   Funções utilitárias usadas no projeto.
  * @author  Pedro Itiro Nagao
- * @date    2025-06-14
+ * @date    2026-06-14
  *
  */
 

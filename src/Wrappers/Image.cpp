@@ -15,7 +15,7 @@
  * @file    Image.cpp
  * @brief   Implementação da classe Image — acesso ao disco EXT4.
  * @author  Pedro Itiro Nagao
- * @date    2025-06-16
+ * @date    2026-06-16
  *
  * Responsável por toda I/O sobre o arquivo de imagem: leitura e escrita
  * de blocos, inodes e descritores de grupo.
