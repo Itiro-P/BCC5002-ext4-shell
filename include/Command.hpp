@@ -152,6 +152,8 @@ namespace Command {
 
     /**
      * @brief Cria um diretório.
+     * @author João Ricardo Zulato Reberti
+     * @date 2026-06-22
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório a ser criado.
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.
@@ -170,6 +172,8 @@ namespace Command {
 
     /**
      * @brief Remove um diretório vazio.
+     * @author João Ricardo Zulato Reberti
+     * @date 2026-06-22s
      * @param img A imagem do sistema de arquivos EXT4 montada, para acessar suas informações.
      * @param args O vetor de argumentos, onde `args[1]` deve ser o caminho do diretório a ser removido (que deve estar vazio).
      * @returns Um código de saída indicando o resultado da execução do comando. Normalmente, 0 para sucesso e um valor diferente de zero para erros.

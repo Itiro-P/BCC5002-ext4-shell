@@ -515,7 +515,6 @@ short Command::to_out(Image &img, const std::span<const std::string> args) {
     return 0;
 }
 
-
 short Command::pwd(Image &img) {
     // Sempre guardamos em `img`, então é só pegar de volta a informação do diretório atual
     std::println("{}", img.get_current_path());
@@ -533,7 +532,6 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
     // Pegamos o diretório
     auto [path, file_name] = Utils::split_path(file_path);
     auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
-
 
     // Vemos se o arquivo já existe. (Usamos ranges para iterar)
     if (std::ranges::any_of(img.list_dir(parent_dir), by_name(file_name))) {
@@ -590,20 +588,89 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
 }
 
 short Command::mkdir(Image &img, const std::span<const std::string> args) {
+    // Pegamos o caminho do diretório a ser criado a partir dos argumentos
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
+    // Verificamos se o caminho do diretório foi fornecido
     if (dir_path.empty()) {
         std::println(std::cerr, "Uso: mkdir <diretório>");
         return 1;
     }
 
+    // Separamos o diretório alvo do nome do diretório a ser criado
     auto [path, path_name] = Utils::split_path(dir_path);
+
+    // Pegamos o diretório pai onde o novo diretório será criado
     auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
 
+    // Verificamos se já existe um diretório ou arquivo com o mesmo nome no diretório pai
     if(std::ranges::any_of(img.list_dir(parent_dir), by_name(path_name))) {
-        std::println("Diretório alvo existe e é um arquivo/diretório");
+        std::println("Já existe um arquivo ou diretório com o nome '{}'.", path_name);
         return 1;
     }
+
+    // Alocamos um inode
+    uint32_t id_inode = img.alloc_inode();
+
+    // Pegamos o timestamp atual para usar nos campos de tempo do inode
+    uint32_t now = static_cast<uint32_t>(std::time(nullptr));
+
+    // Inicializa a estrutura do inode
+    Raw::Inode new_inode{
+        .i_mode      = Flags::InodeMode::S_IFDIR | 0755,  // diretório + permissões 755
+        .i_size_lo   = 0,
+        // Timestamps
+        .i_atime = now,
+        .i_ctime = now,
+        .i_mtime = now,
+        .i_links_count = 2, // O número de links começa em 2 porque um link é para ele mesmo (".") e outro é para o diretório pai ("..").
+        .i_flags     = Flags::InodeFlags::EXT4_EXTENTS_FL,  // EXT4_EXTENTS_FL (usamos extents)
+        .i_size_hi   = 0,
+        .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize, // Aqui só usamos o que o superbloco manda para evitar inconsistências
+
+    };
+
+    // Calcula o número máximo de extents inline que cabem no i_block do inode
+    uint16_t max_inline = (sizeof(Raw::Inode::i_block) - sizeof(Raw::ExtentHeader)) / sizeof(Raw::ExtentLeaf);
+
+    // Inicializa extent header dentro do i_block
+    Raw::ExtentHeader eh{
+        .eh_magic      = Constants::EXTENT_MAGIC,
+        .eh_entries    = 0,
+        .eh_max        = max_inline,
+        .eh_depth      = 0,
+        .eh_generation = 0,
+    };
+
+    // Escrevemos o novo inode na imagem
+    Utils::write_to(new_inode.i_block, eh);
+    img.write_inode(Wrappers::Inode(
+        id_inode,
+        img.get_volume_uuid(),
+        img.get_superblock().get_inode_size(),
+        new_inode,
+        std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0}))
+    );
+    
+    // Colocamos o novo inode no diretório pai
+    img.dir_add_entry(parent_dir, id_inode, dir_path, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
+
+    // Pegamos o diretório pai
+    Raw::Inode parent_raw = parent_dir.get_raw();
+
+    // Modificamos o inode pai para modificar o campo "modificado"
+    parent_raw.i_mtime = now;
+
+    // Incrementa o número de links do diretório pai (o novo diretório é um link para ele)
+    parent_raw.i_links_count += 1; 
+
+    // Atualizamos os dados do diretório pai para refletir a nova entrada
+    parent_dir.set_raw(parent_raw);
+    
+    // Atualizamos o diretório pai
+    img.write_inode(parent_dir);
+
+
 
     return 0;
 }
@@ -644,25 +711,34 @@ short Command::rm(Image &img, const std::span<const std::string> args) {
 }
 
 short Command::rmdir(Image &img, const std::span<const std::string> args) {
+    // Pegamos o caminho do diretório a ser removido a partir dos argumentos
     const std::string dir_path = args.size() > 1 ? args[1] : "";
 
+    // Verificamos se o caminho do diretório foi fornecido
     if (dir_path.empty()) {
         std::println(std::cerr, "Uso: rmdir <diretório>");
         return 1;
     }
 
+    // Separamos o diretório alvo do nome do diretório a ser removido
     auto [path, path_name] = Utils::split_path(dir_path);
+
+    // Pegamos o diretório pai onde o diretório será removido
     auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
 
+    // Pegamos a lista de entradas do diretório pai
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
+    // Vemos se o diretório não existe mais
     auto target = std::ranges::find_if(entries, by_name(path_name));
 
+    // Se não existir, retornamos erro
     if (target == entries.end()) {
         std::println(std::cerr, "Erro: Diretório '{}' não encontrado.", path_name);
         return 1;
     }
 
+    // Verificamos se o alvo é realmente um diretório
     if (!target->is_dir()) {
         std::println(std::cerr, "Erro: '{}' não é um diretório. Use rm.", path_name);
         return 1;
@@ -679,6 +755,25 @@ short Command::rmdir(Image &img, const std::span<const std::string> args) {
             return 1;
         }
     }
+
+    // Pegamos o timestamp atual para usar nos campos de tempo do inode
+    uint32_t now = static_cast<uint32_t>(std::time(nullptr));
+
+
+    // Pegamos o diretório pai
+    Raw::Inode parent_raw = parent_dir.get_raw();
+
+    // Modificamos o inode pai para modificar o campo "modificado"
+    parent_raw.i_mtime = now;
+
+    // Incrementa o número de links do diretório pai (o novo diretório é um link para ele)
+    parent_raw.i_links_count += 1; 
+
+    // Atualizamos os dados do diretório pai para refletir a nova entrada
+    parent_dir.set_raw(parent_raw);
+    
+    // Atualizamos o diretório pai
+    img.write_inode(parent_dir);
 
     return 0;
 }
