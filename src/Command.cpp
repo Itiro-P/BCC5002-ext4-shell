@@ -724,12 +724,12 @@ short Command::rmdir(Image &img, const std::span<const std::string> args) {
     auto [path, path_name] = Utils::split_path(dir_path);
 
     // Pegamos o diretório pai onde o diretório será removido
-    auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
+    auto [parent_dir_inode, _] = img.resolve_path(path, img.get_current_inode());
 
     // Pegamos a lista de entradas do diretório pai
-    std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
+    std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir_inode);
 
-    // Vemos se o diretório não existe mais
+    // Pegamos o diretorio que queremos remover (se existir) da lista de entradas do diretório pai
     auto target = std::ranges::find_if(entries, by_name(path_name));
 
     // Se não existir, retornamos erro
@@ -744,8 +744,10 @@ short Command::rmdir(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
-    // Validando se o diretório está realmente vazio
+    // Pegamos o inode do diretório alvo
     Wrappers::Inode target_inode = img.get_inode(target->get_inode());
+
+    // Listamos as entradas do diretório alvo
     std::vector<Wrappers::DirectoryEntry> target_entries = img.list_dir(target_inode);
     
     // Um diretório vazio tem no máximo 2 entradas ("." e "..")
@@ -759,21 +761,21 @@ short Command::rmdir(Image &img, const std::span<const std::string> args) {
     // Pegamos o timestamp atual para usar nos campos de tempo do inode
     uint32_t now = static_cast<uint32_t>(std::time(nullptr));
 
-
+    // Removemos o inode atual do diretório pai e ao mesmo tempo decrementamos o contador de links do diretório pai e 
+    // excluimos os blocos do diretorio que queremos excluir
+    img.dir_remove_entry(parent_dir_inode, path_name);
+    
     // Pegamos o diretório pai
-    Raw::Inode parent_raw = parent_dir.get_raw();
-
-    // Modificamos o inode pai para modificar o campo "modificado"
+    Raw::Inode parent_raw = parent_dir_inode.get_raw();
+    
+    // Modificamos o inode pai para mudar o campo "modificado"
     parent_raw.i_mtime = now;
-
-    // Incrementa o número de links do diretório pai (o novo diretório é um link para ele)
-    parent_raw.i_links_count += 1; 
-
+    
     // Atualizamos os dados do diretório pai para refletir a nova entrada
-    parent_dir.set_raw(parent_raw);
+    parent_dir_inode.set_raw(parent_raw);
     
     // Atualizamos o diretório pai
-    img.write_inode(parent_dir);
+    img.write_inode(parent_dir_inode);
 
     return 0;
 }
