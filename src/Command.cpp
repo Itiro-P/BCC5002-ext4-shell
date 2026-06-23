@@ -601,16 +601,13 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
     auto [path, path_name] = Utils::split_path(dir_path);
 
     // Pegamos o diretório pai onde o novo diretório será criado
-    auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
+    auto [parent_dir_inode, _] = img.resolve_path(path, img.get_current_inode());
 
     // Verificamos se já existe um diretório ou arquivo com o mesmo nome no diretório pai
-    if(std::ranges::any_of(img.list_dir(parent_dir), by_name(path_name))) {
+    if(std::ranges::any_of(img.list_dir(parent_dir_inode), by_name(path_name))) {
         std::println("Já existe um arquivo ou diretório com o nome '{}'.", path_name);
         return 1;
     }
-
-    // Alocamos um inode
-    uint32_t id_inode = img.alloc_inode();
 
     // Pegamos o timestamp atual para usar nos campos de tempo do inode
     uint32_t now = static_cast<uint32_t>(std::time(nullptr));
@@ -627,23 +624,41 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
         .i_flags     = Flags::InodeFlags::EXT4_EXTENTS_FL,  // EXT4_EXTENTS_FL (usamos extents)
         .i_size_hi   = 0,
         .i_extra_isize = img.get_inode(2).get_raw().i_extra_isize, // Aqui só usamos o que o superbloco manda para evitar inconsistências
-
+        
     };
-
+    
     // Calcula o número máximo de extents inline que cabem no i_block do inode
     uint16_t max_inline = (sizeof(Raw::Inode::i_block) - sizeof(Raw::ExtentHeader)) / sizeof(Raw::ExtentLeaf);
-
+    
     // Inicializa extent header dentro do i_block
     Raw::ExtentHeader eh{
         .eh_magic      = Constants::EXTENT_MAGIC,
-        .eh_entries    = 0,
+        .eh_entries    = 1,
         .eh_max        = max_inline,
         .eh_depth      = 0,
-        .eh_generation = 0,
     };
 
+    // Alocamos um bloco
+    uint32_t id_block = img.alloc_block();
+
+    Raw::ExtentLeaf leaf{
+        .ee_block = 0,
+        .ee_len = 1,
+        .ee_start_hi = 0,
+        .ee_start_lo = id_block
+    };
+
+    // Alocamos um inode
+    uint32_t id_inode = img.alloc_inode();
+    
     // Escrevemos o novo inode na imagem
+    // Começamos pelo cabeçalho de extent
     Utils::write_to(new_inode.i_block, eh);
+
+    // Colocamos a folha correspondente
+    Utils::write_to(new_inode.i_block, leaf, sizeof(eh));
+
+    // Escrevemos o inode na imagem
     img.write_inode(Wrappers::Inode(
         id_inode,
         img.get_volume_uuid(),
@@ -651,12 +666,43 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
         new_inode,
         std::vector<std::byte>(img.get_superblock().get_inode_size() - sizeof(Raw::Inode), std::byte{0}))
     );
+
+    // Criamos uma entrada de diretório para o novo diretório
+    Raw::DirectoryEntry dot{
+        .inode = id_inode,
+        .rec_len = Utils::to_4bit_aligned(sizeof(Raw::DirectoryEntry) + 1),
+        .name_len = 1,
+        .file_type = Raw::DirectoryFileType::EXT4_FT_DIR
+    },
+    // Criamos uma entrada de diretório para o diretório pai
+    dotdot{
+        .inode = parent_dir_inode.get_inode_id(),
+        .rec_len = Utils::to_4bit_aligned(sizeof(Raw::DirectoryEntry) + 2),
+        .name_len = 2,
+        .file_type = Raw::DirectoryFileType::EXT4_FT_DIR
+    };
+
+    // Criamos um buffer do tamanho do bloco para escrever a entrada de diretório
+    std::vector<std::byte> buffer_block(sizeof(img.get_superblock().get_block_size()));
+
+    // Criamos uma view do buffer para escrever as entradas de diretório
+    std::span<std::byte> buffer_span = Utils::as_byte_span(buffer_block);
+
+    //Escrevemos as entradas de diretório no buffer
+    Utils::write_to(buffer_span, dot);
+    Utils::write_to(buffer_span, dotdot, sizeof(dot));
+
+    // Escrevemos a entrada de diretório no buffer
+    img.write_block(id_block, buffer_span);
     
+    // Pegamos o inode que criamos
+    Ext4::Wrappers::Inode target_inode = img.get_inode(id_inode);
+
     // Colocamos o novo inode no diretório pai
-    img.dir_add_entry(parent_dir, id_inode, dir_path, Raw::DirectoryFileType::EXT4_FT_REG_FILE);
+    img.dir_add_entry(parent_dir_inode, id_inode, dir_path, Raw::DirectoryFileType::EXT4_FT_DIR);
 
     // Pegamos o diretório pai
-    Raw::Inode parent_raw = parent_dir.get_raw();
+    Raw::Inode parent_raw = parent_dir_inode.get_raw();
 
     // Modificamos o inode pai para modificar o campo "modificado"
     parent_raw.i_mtime = now;
@@ -665,12 +711,10 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
     parent_raw.i_links_count += 1; 
 
     // Atualizamos os dados do diretório pai para refletir a nova entrada
-    parent_dir.set_raw(parent_raw);
+    parent_dir_inode.set_raw(parent_raw);
     
     // Atualizamos o diretório pai
-    img.write_inode(parent_dir);
-
-
+    img.write_inode(parent_dir_inode);
 
     return 0;
 }
