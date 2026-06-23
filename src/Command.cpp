@@ -683,21 +683,31 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
     };
 
     // Criamos um buffer do tamanho do bloco para escrever a entrada de diretório
-    std::vector<std::byte> buffer_block(sizeof(img.get_superblock().get_block_size()));
+    std::vector<std::byte> buffer_block(img.get_superblock().get_block_size());
 
     // Criamos uma view do buffer para escrever as entradas de diretório
     std::span<std::byte> buffer_span = Utils::as_byte_span(buffer_block);
-
     //Escrevemos as entradas de diretório no buffer
     Utils::write_to(buffer_span, dot);
     Utils::write_to(buffer_span, dotdot, sizeof(dot));
 
+    // Pegamos o inode que criamos
+    Wrappers::Inode target_inode = img.get_inode(id_inode);
+
+    // Verificamos se o superbloco tem checksum de metadados habilitado.
+    if(img.get_superblock().has_metadata_csum()) {
+        // Se sim, calculamos o checksum do diretório e escrevemos no final do bloco.
+        Raw::DirectoryEntryTail tail{
+            .det_rec_len = 12,
+            .det_reserved_ft = Raw::DirectoryFileType::EXT4_FT_DIR_CSUM,
+            .det_checksum = Checksums::checksum_dir(target_inode, buffer_span, img.get_superblock().get_block_size(), img.get_superblock().get_checksum_seed()),
+        };
+        Utils::write_to(buffer_span, tail, buffer_span.size() - sizeof(tail));
+    }
+
     // Escrevemos a entrada de diretório no buffer
     img.write_block(id_block, buffer_span);
     
-    // Pegamos o inode que criamos
-    Ext4::Wrappers::Inode target_inode = img.get_inode(id_inode);
-
     // Colocamos o novo inode no diretório pai
     img.dir_add_entry(parent_dir_inode, id_inode, dir_path, Raw::DirectoryFileType::EXT4_FT_DIR);
 
