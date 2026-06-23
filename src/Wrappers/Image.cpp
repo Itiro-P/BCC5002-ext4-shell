@@ -251,9 +251,9 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(const Wrappers::In
     const Raw::ExtentHeader &header) {
     
     // Vemos se o número mágico é válido
-    if (header.eh_magic != Constants::EXTENT_MAGIC) {
+    if (header.eh_magic != Constants::EXTENT_MAGIC)
         throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico de extents inválido.");
-    }
+
     // Quando o sistema usa extents, pode ocorrer duas coisas (sendo uma):
     // - O ExtentHeader sinalizar que os próximos bytes são ExtentIndex. 
     //     Então devemos ir até o bloco que o ExtentIndex aponta e fazer o processo recursivamente até achar um ExtentHeader onde eh_depth == 0
@@ -364,9 +364,8 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
     for (const auto &it : paths) {
         // Será que temos um inode válido?
         if (inode.get_type() != Flags::S_IFDIR) {
-            std::println(std::cerr, "Erro: O componente {} não é um diretório.", it);
-            // Fallback
-            return {base, this->get_current_path()};
+            // Não um inode válido aqui
+            return std::pair{base, this->get_current_path()};
         }
         // Agora sabemos que temos um inode que representa um diretório...
         auto entries = this->list_dir(inode);
@@ -398,8 +397,8 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
             }
         }
 
-        if (!found) {
-            std::println(std::cerr, "Erro: O componente {} não existe.", it);
+        if(!found) {
+            // Não achamos um inode que corresponde ao diretório
             return {base, this->get_current_path()};
         }
     }
@@ -952,7 +951,7 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
     // Configura a nova entrada no espaço restante
     Raw::DirectoryEntry new_raw{
         .inode = target_ino,
-        .rec_len = old_total_rec_len - last_raw.rec_len,
+        .rec_len = static_cast<uint16_t>(old_total_rec_len - last_raw.rec_len),
         .name_len = static_cast<uint8_t>(name.size()),
         .file_type = file_type,
     };
