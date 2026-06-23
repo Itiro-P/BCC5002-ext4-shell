@@ -701,13 +701,13 @@ short Command::rename(Image &img, const std::span<const std::string> args) {
     auto [new_dir, _] = img.resolve_path(new_path, img.get_current_inode());
 
     // Vemos se o arquivo existe
-    if (std::ranges::any_of(img.list_dir(parent_dir), by_name(file_name))) {
+    if(std::ranges::none_of(img.list_dir(parent_dir), by_name(file_name))) {
         std::println(std::cerr, "Erro: '{}' não encontrado.", file_name);
         return 1;
     }
 
     // Vemos se já existe o arquivo alvo
-    if (std::ranges::any_of(img.list_dir(new_dir), by_name(new_name))) {
+    if(std::ranges::any_of(img.list_dir(new_dir), by_name(new_name))) {
         std::println(std::cerr, "Erro: '{}' já existe.", new_name);
         return 1;
     }
