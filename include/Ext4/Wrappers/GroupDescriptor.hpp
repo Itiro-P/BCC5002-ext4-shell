@@ -68,7 +68,7 @@ namespace Ext4::Wrappers {
         uint32_t get_free_inodes_count() const;
 
         /**
-         * @brief Retorna a quantidade de inodes não usados na tabela.
+         * @brief Retorna a quantidade de inodes não usados no final da tabela.
          */
         uint32_t get_itable_unused() const;
 
