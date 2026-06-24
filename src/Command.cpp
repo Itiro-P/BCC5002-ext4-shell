@@ -503,8 +503,8 @@ short Command::to_out(Image &img, const std::span<const std::string> args) {
 
     // Vemos se o arquivo alvo existe na imagem. Só ver o nome é só suficiente, certo? :)
     auto [src_inode, src_resolved_path] = img.resolve_path(src_path, img.get_current_inode());
-    if(src_inode.is_dir()) {
-        std::println("Arquivo alvo na verdade é um diretório.");
+    if(!src_inode.is_dir()) {
+        std::println(std::cerr, "Diretório alvo na verdade é um arquivo.");
         return 1;
     }
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(src_inode);
