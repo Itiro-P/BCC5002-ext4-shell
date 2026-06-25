@@ -135,7 +135,7 @@ void Wrappers::Image::write_offset(const std::streamoff offset, const std::span<
         ));
     }
 
-    // Atualiza (sincroniza) o buffer do `fstream` para que trabalhemos sem com a imagem atualizada.
+    // Atualiza (sincroniza) o buffer do `fstream` para que trabalhemos sempre com a imagem atualizada.
     this->image_file.flush();
 }
 
