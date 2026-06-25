@@ -841,7 +841,7 @@ void Ext4::Wrappers::Image::free_inode(const uint32_t ino, const bool is_dir) {
     if (this->super_block.has_metadata_csum())
         Utils::split(new_bitmap_csum, new_raw.bg_inode_bitmap_csum_lo, new_raw.bg_inode_bitmap_csum_hi);
     
-    uint32_t new_inodes_count = to_change.get_free_inodes_count() +1;
+    uint32_t new_inodes_count = to_change.get_free_inodes_count() + 1;
     Utils::split(new_inodes_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
 
     // Se liberamos um inode no final da tabela, atualizamos o itable
@@ -855,7 +855,6 @@ void Ext4::Wrappers::Image::free_inode(const uint32_t ino, const bool is_dir) {
         uint32_t used_dirs_count = to_change.get_used_dirs_count() - 1;
         Utils::split(used_dirs_count, new_raw.bg_used_dirs_count_lo, new_raw.bg_used_dirs_count_hi);
     }
-    
     to_change.set_raw(new_raw);
     this->write_gdt(to_change);
 
@@ -949,7 +948,7 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
     uint16_t old_total_rec_len = last_raw.rec_len;
 
     // O rec_len encolhido precisa ser alinhado a 4 bytes
-    last_raw.rec_len = Utils::to_4bit_aligned(sizeof(Raw::DirectoryEntry) + last_raw.name_len);
+    last_raw.rec_len = Utils::to_4bit_aligned<uint16_t>(sizeof(Raw::DirectoryEntry) + last_raw.name_len);
 
     // Onde a nova entrada vai começar dentro do buffer
     size_t local_new_entry_offset = local_last_entry_offset + last_raw.rec_len;

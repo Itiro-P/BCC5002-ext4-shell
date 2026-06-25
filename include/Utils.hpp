@@ -42,8 +42,16 @@ namespace Utils {
     template<typename Lo, typename Hi>
     void split(uint64_t value, Lo &lo, Hi &hi) {
         constexpr size_t lo_bits = sizeof(Lo) * 8;
-        lo = static_cast<Lo>(value & ((1ULL << lo_bits) - 1));
-        hi = static_cast<Hi>(value >> lo_bits);
+        
+        // O static_cast para um tipo menor descarta automaticamente os bits superiores de forma segura
+        lo = static_cast<Lo>(value);
+        
+        // Deslocamos com segurança. Se lo_bits for >= 64, hi simplesmente recebe 0
+        if constexpr (lo_bits < 64) {
+            hi = static_cast<Hi>(value >> lo_bits);
+        } else {
+            hi = static_cast<Hi>(0);
+        }
     }
 
     /**

@@ -76,7 +76,7 @@ namespace Ext4::Wrappers {
          * @brief Retorna a quantidade de inodes que são diretórios neste grupo. Para imagens EXT4 de 64 bits, este valor é composto por bg_used_dirs_count_lo e bg_used_dirs_count_hi. Para imagens sem suporte a 64 bits, apenas bg_used_dirs_count_lo é usado.
          * Este valor é exibido em `info` para dar uma ideia da quantidade de diretórios presentes no grupo, mas não é usado para controle de alocação.
          */
-        uint16_t get_used_dirs_count() const;
+        uint32_t get_used_dirs_count() const;
 
         /**
          * @brief Flags — bg_flags indica se o grupo tem bitmap/inode table inicializados 

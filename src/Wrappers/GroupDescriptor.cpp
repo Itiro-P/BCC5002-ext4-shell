@@ -47,7 +47,7 @@ uint32_t Ext4::Wrappers::GroupDescriptor::get_itable_unused() const {
         : raw.bg_itable_unused_lo;
 }
 
-uint16_t Ext4::Wrappers::GroupDescriptor::get_used_dirs_count() const {
+uint32_t Ext4::Wrappers::GroupDescriptor::get_used_dirs_count() const {
     return _is_64
         ? Utils::concatenate(raw.bg_used_dirs_count_lo, raw.bg_used_dirs_count_hi)
         : raw.bg_used_dirs_count_lo;
