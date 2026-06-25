@@ -12,7 +12,7 @@
  * @file    Shell.hpp
  * @brief   Cabeçalho da classe `Shell`. Responsável por passar a entrada do usuário para suas respectivas funções.
  * @author  Pedro Itiro Nagao
- * @date    2025-06-14
+ * @date    2026-06-14
  *
  */
 
@@ -27,16 +27,18 @@ class Shell {
     // Imagem que será carregada e manipulada pelos comandos do shell.
     Image image;
 
-    static inline constexpr std::string fail_prefix = "\033[31mx\033[0m";
-    static inline constexpr std::string success_prefix = "\033[32m+\033[0m";
+    static constexpr std::string fail_prefix = "\033[31mx\033[0m";
+    static constexpr std::string success_prefix = "\033[32m+\033[0m";
 
     // Comandos para saida do shell.
     static inline std::unordered_set<std::string> exit_commands{"exit", "quit", "\\q"};
 
     // Hash de comandos com suas respectivas funções.
+    // Em casos onde usamos só `tipo &` estamos dizendo que NÃO usaremos os parâmetros na função
+    // E evitamos o warning de parâmetro não usado
     static inline std::unordered_map<std::string, std::function<short(Image&, const CommandArgs&)>> command_map{ 
-        {"help",   [](Image &img, const CommandArgs &args) { return Command::help(); }},
-        {"info",   [](Image &img, const CommandArgs &args) { return Command::info(img); }},
+        {"help",   [](Image &, const CommandArgs &) { return Command::help(); }},
+        {"info",   [](Image &img, const CommandArgs &) { return Command::info(img); }},
         {"cat",    [](Image &img, const CommandArgs &args) { return Command::cat(img, args); }},
         {"attr",   [](Image &img, const CommandArgs &args) { return Command::attr(img, args); }},
         {"cd",     [](Image &img, const CommandArgs &args) { return Command::cd(img, args); }},
@@ -45,13 +47,13 @@ class Shell {
         {"testb",  [](Image &img, const CommandArgs &args) { return Command::test_block(img, args); }},
         {"import", [](Image &img, const CommandArgs &args) { return Command::to_in(img, args); }},
         {"export", [](Image &img, const CommandArgs &args) { return Command::to_out(img, args); }},
-        {"pwd",    [](Image &img, const CommandArgs &args) { return Command::pwd(img); }},
+        {"pwd",    [](Image &img, const CommandArgs &) { return Command::pwd(img); }},
         {"touch",  [](Image &img, const CommandArgs &args) { return Command::touch(img, args); }},
         {"mkdir",  [](Image &img, const CommandArgs &args) { return Command::mkdir(img, args); }},
         {"rm",     [](Image &img, const CommandArgs &args) { return Command::rm(img, args); }},
         {"rmdir",  [](Image &img, const CommandArgs &args) { return Command::rmdir(img, args); }},
         {"rename", [](Image &img, const CommandArgs &args) { return Command::rename(img, args); }},
-        {"clear",  [](Image &img, const CommandArgs &args) { return Command::clear(); }}
+        {"clear",  [](Image &, const CommandArgs &) { return Command::clear(); }}
     };
 
     /** 

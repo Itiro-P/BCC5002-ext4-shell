@@ -12,7 +12,7 @@
  * @file    SuperBlock.cpp
  * @brief   Implementação da classe SuperBlock — manipulação do superbloco
  * @author  Pedro Itiro Nagao
- * @date    2025-06-14
+ * @date    2026-06-14
  *
  * Classe de conveniência para não precisar calcular manualmente bits concatenados dos campos.
  */

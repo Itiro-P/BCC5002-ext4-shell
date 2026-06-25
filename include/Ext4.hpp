@@ -11,7 +11,7 @@
  * @file    Ext4.hpp
  * @brief   Namespace principal do projeto, contendo as definições de estruturas, classes e funções relacionadas ao sistema de arquivos EXT4.
  * @author  Pedro Itiro Nagao
- * @date    2025-06-14
+ * @date    2026-06-14
  *
  */
 namespace Ext4 {

@@ -6,7 +6,7 @@
  * @file    main.cpp
  * @brief   Ponto de entrada do programa, onde a imagem do sistema de arquivos EXT4 é carregada e o shell é iniciado.
  * @author  Pedro Itiro Nagao
- * @date    2025-06-08
+ * @date    2026-06-08
  */
 
 int main(int argc, char* argv[]) {

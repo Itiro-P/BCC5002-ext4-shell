@@ -2,6 +2,11 @@ CXX      := g++
 CXXFLAGS := -std=c++23 -Wall -Wextra -pedantic -O2
 DBGFLAGS := -std=c++23 -Wall -Wextra -pedantic -g -O0 -DDEBUG -fsanitize=address,undefined
 
+# A partir C++20 variáveis declaradas com designated initializers já são construídas com valores padrão
+# caso uma propriedade seja omitida (fallback para valor padrão da struct ou construtor padrão).
+# Mas, bizarramente, o compilador reclama. Então só suprimimos.
+CXXFLAGS += -Wno-missing-field-initializers
+
 TARGET   := ext4shell
 SRCS     := main.cpp $(wildcard src/*.cpp) $(wildcard src/Wrappers/*.cpp)
 OBJS     := $(SRCS:.cpp=.o)

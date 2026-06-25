@@ -7,9 +7,9 @@
 namespace Ext4::Wrappers {
     class GroupDescriptor {
         Raw::GroupDescriptor raw;
-        bool _is_64;
         uint32_t _group_number;
         uint16_t _desc_size;
+        bool _is_64;
     public:
         GroupDescriptor(const Raw::GroupDescriptor &raw, const uint32_t group_number, const uint16_t desc_size, const bool is_64): raw(raw), _group_number(group_number), _desc_size(desc_size), _is_64(is_64) {}
 
@@ -68,7 +68,7 @@ namespace Ext4::Wrappers {
         uint32_t get_free_inodes_count() const;
 
         /**
-         * @brief Retorna a quantidade de inodes não usados na tabela.
+         * @brief Retorna a quantidade de inodes não usados no final da tabela.
          */
         uint32_t get_itable_unused() const;
 

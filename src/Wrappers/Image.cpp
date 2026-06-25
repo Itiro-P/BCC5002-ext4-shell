@@ -15,7 +15,7 @@
  * @file    Image.cpp
  * @brief   Implementação da classe Image — acesso ao disco EXT4.
  * @author  Pedro Itiro Nagao
- * @date    2025-06-16
+ * @date    2026-06-16
  *
  * Responsável por toda I/O sobre o arquivo de imagem: leitura e escrita
  * de blocos, inodes e descritores de grupo.
@@ -251,9 +251,9 @@ std::vector<uint64_t> Wrappers::Image::read_blocks_from_index(const Wrappers::In
     const Raw::ExtentHeader &header) {
     
     // Vemos se o número mágico é válido
-    if (header.eh_magic != Constants::EXTENT_MAGIC) {
+    if (header.eh_magic != Constants::EXTENT_MAGIC)
         throw std::runtime_error("Erro ao ler os blocos do Inode: Número mágico de extents inválido.");
-    }
+
     // Quando o sistema usa extents, pode ocorrer duas coisas (sendo uma):
     // - O ExtentHeader sinalizar que os próximos bytes são ExtentIndex. 
     //     Então devemos ir até o bloco que o ExtentIndex aponta e fazer o processo recursivamente até achar um ExtentHeader onde eh_depth == 0
@@ -364,9 +364,8 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
     for (const auto &it : paths) {
         // Será que temos um inode válido?
         if (inode.get_type() != Flags::S_IFDIR) {
-            std::println(std::cerr, "Erro: O componente {} não é um diretório.", it);
-            // Fallback
-            return {base, this->get_current_path()};
+            // Não um inode válido aqui
+            return std::pair{base, this->get_current_path()};
         }
         // Agora sabemos que temos um inode que representa um diretório...
         auto entries = this->list_dir(inode);
@@ -398,8 +397,8 @@ std::pair<Wrappers::Inode, std::string> Wrappers::Image::resolve_path(const std:
             }
         }
 
-        if (!found) {
-            std::println(std::cerr, "Erro: O componente {} não existe.", it);
+        if(!found) {
+            // Não achamos um inode que corresponde ao diretório
             return {base, this->get_current_path()};
         }
     }
@@ -598,8 +597,11 @@ uint32_t Ext4::Wrappers::Image::alloc_inode(const bool is_dir) {
     uint32_t new_inode_count = to_change.get_free_inodes_count() - 1;
     Utils::split(new_inode_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
     
-    uint32_t new_itable_unused = to_change.get_itable_unused() - 1;
-    Utils::split(new_itable_unused, new_raw.bg_itable_unused_lo, new_raw.bg_itable_unused_hi);
+    // Se pegamos um inode no final da tabela, atualizamos o itable
+    if(uint32_t unused = to_change.get_itable_unused(); bit_pos >= this->super_block.get_inodes_per_group() - unused) {
+        uint32_t new_itable_unused = to_change.get_itable_unused() - 1;
+        Utils::split(new_itable_unused, new_raw.bg_itable_unused_lo, new_raw.bg_itable_unused_hi);
+    }
 
     // Caso seja um diretório, temos que incrementar o contador de diretórios do GDT
     if (is_dir) {
@@ -842,8 +844,11 @@ void Ext4::Wrappers::Image::free_inode(const uint32_t ino, const bool is_dir) {
     uint32_t new_inodes_count = to_change.get_free_inodes_count() +1;
     Utils::split(new_inodes_count, new_raw.bg_free_inodes_count_lo, new_raw.bg_free_inodes_count_hi);
 
-    uint32_t new_itable_unused = to_change.get_itable_unused() +1;
-    Utils::split(new_itable_unused, new_raw.bg_itable_unused_lo, new_raw.bg_itable_unused_hi);
+    // Se liberamos um inode no final da tabela, atualizamos o itable
+    if(uint32_t unused = to_change.get_itable_unused(); bit_pos + 1== this->super_block.get_inodes_per_group() - unused) {
+        uint32_t new_itable_unused = to_change.get_itable_unused() + 1;
+        Utils::split(new_itable_unused, new_raw.bg_itable_unused_lo, new_raw.bg_itable_unused_hi);
+    }
 
     // Caso seja um diretório, temos que decrementar o contador de diretórios do GDT
     if (is_dir) {
@@ -952,7 +957,7 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
     // Configura a nova entrada no espaço restante
     Raw::DirectoryEntry new_raw{
         .inode = target_ino,
-        .rec_len = old_total_rec_len - last_raw.rec_len,
+        .rec_len = static_cast<uint16_t>(old_total_rec_len - last_raw.rec_len),
         .name_len = static_cast<uint8_t>(name.size()),
         .file_type = file_type,
     };
@@ -1014,6 +1019,7 @@ void Ext4::Wrappers::Image::dir_unlink_entry(const Wrappers::Inode &dir_inode, c
     }
 
     // Caso geral: expande rec_len da entry anterior
+    // Pegamos o par (antes_alvo, alvo)
     auto processed_view = entries | std::views::adjacent<2>;
     auto it = std::ranges::find_if(processed_view, [&](const auto &p){
         return std::get<1>(p).get_name() == name;
@@ -1058,8 +1064,7 @@ void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, c
         return e.get_name() == name;
     });
 
-    if (target == entries.end()) return;
-
+    if(target == entries.end()) return;
     uint32_t ino = target->get_inode();
     bool is_directory = target->is_dir();
 
@@ -1069,33 +1074,28 @@ void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, c
     Wrappers::Inode inode = this->get_inode(ino);
     Raw::Inode raw = inode.get_raw();
 
-    if (is_directory) {
-        raw.i_links_count = 0; 
-    } else {
-        // Só decrementa se for maior que zero para evitar sobrefluxo (underflow) de inteiros
-        if (raw.i_links_count > 0) {
-            raw.i_links_count--;
-        }
-    }
+    // Diretórios precisam ter seu i_links_count decrementado
+    // Se chegar a 0, liberamos os recursos
+    if(is_directory) raw.i_links_count = 0;
+    else if(raw.i_links_count > 0) raw.i_links_count--;
 
-    // Se ainda restam links (Hard Links em outras pastas), NÃO APAGUE OS BLOCOS NEM O INODE!
-    if (raw.i_links_count == 0) {
-        std::vector<uint64_t> blocks = this->get_blocks(inode);
+    bool should_delete = (raw.i_links_count == 0);
+    std::vector<uint64_t> blocks_to_free;
+    if(should_delete) blocks_to_free = this->get_blocks(inode);  // coleta ANTES de zerar
+
+    if(should_delete) {
         raw.i_dtime = static_cast<uint32_t>(std::time(nullptr));
         raw.i_mode = 0;
-        raw.i_links_count = 0;
         raw.i_size_lo = 0;
         raw.i_size_hi = 0;
-        
-        inode.set_raw(raw);
-        this->write_inode(inode);   
-        this->free_inode(ino, is_directory);      
-        for (const auto &blk : blocks) this->free_block(blk);
-    } else {
-        // Caso clássico de Hard Link: o arquivo perdeu o nome atual, mas o conteúdo
-        // continua vivo no disco porque outra pasta (ex: /documentos/vazio.txt) aponta para ele.
-        inode.set_raw(raw);
-        this->write_inode(inode);
+    }
+
+    inode.set_raw(raw);
+    this->write_inode(inode);
+
+    if (should_delete) {
+        this->free_inode(ino, is_directory);
+        for (const auto &blk : blocks_to_free) this->free_block(blk);
     }
 }
 

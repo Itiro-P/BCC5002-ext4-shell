@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cmath>
+#include <filesystem>
 
 /**
  * @file    Command.cpp
@@ -93,7 +94,7 @@ uint32_t build_extent_tree(
             Raw::ExtentIndex idx{
                 .ei_block = child_leafs[0].ee_block,
                 .ei_leaf_lo = static_cast<uint32_t>(child_phys_block & MAX_32BIT),
-                .ei_leaf_hi = static_cast<uint16_t>((child_phys_block >> 32) & MAX_16BIT),
+                .ei_leaf_hi = 0,  // uint32_t nunca tem bits acima de 31
             };
             index_entries.push_back(idx);
 
@@ -137,7 +138,6 @@ short Command::info(Image &img) {
 
 short Command::cat(Image &img, const std::span<const std::string> args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
-
     if (file_path.empty()) {
         std::println(std::cerr, "Uso: cat <arquivo>");
         return 1;
@@ -145,9 +145,8 @@ short Command::cat(Image &img, const std::span<const std::string> args) {
 
     // Separamos o diretório do arquivo
     auto [path, file_name] = Utils::split_path(file_path);
-
-    // Resolvemos o diretório para um inode (procura que pode ser recursiva)
-    auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
+    // Resolvemos o diretório para um inode
+    auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
     // Cria a view filtrada para ver se há um arquivo aqui.
@@ -213,7 +212,7 @@ short Command::cd(Image &img, const std::span<const std::string> args) {
 short Command::ls(Image &img, const std::span<const std::string> args) {
     const std::string target_path = args.size() > 1 ? args[1] : img.get_current_path();
     // Pegamos o diretório no sistema
-    auto [parent_dir, _] = img.resolve_path(target_path, img.get_current_inode());
+    auto [parent_dir, resolved_path] = img.resolve_path(target_path, img.get_current_inode());
 
     // Agora só listamos eles
     for (const auto &entry: img.list_dir(parent_dir)) {
@@ -276,17 +275,28 @@ short Command::test_block(Image &img, const std::span<const std::string> args) {
 }
 
 short Command::to_in(Image &img, const std::span<const std::string> args) {
-    const std::string source_path = args.size() > 1 ? args[1] : "";
-    const std::string dest_path = args.size() > 2 ? args[2] : "";
-
-    if (source_path.empty() || dest_path.empty()) {
-        std::println(std::cerr, "Uso: import <arquivo do SO> <diretório na imagem>");
+    std::filesystem::path source_path(args.size() > 1 ? args[1] : "");
+    
+    // Usamos `std::filesystem` para perguntar ao SO se o arquivo existe
+    if(!std::filesystem::exists(source_path)) {
+        std::println(std::cerr, "Uso: import <arquivo do SO> <diretório/arquivo na imagem>");
+        return 1;
+    }
+    // Usamos `std::filesystem` para perguntar ao SO se o arquivo é na verdade um diretório
+    if(std::filesystem::is_directory(source_path)) {
+        std::println(std::cerr, "O arquivo alvo na verdade é um diretório.");
         return 1;
     }
 
+    // Caso o diretório de destino não seja dado nós usamos o diretório atual + nome do alvo
+    const std::string dest_path = (args.size() > 2 ? 
+        args[2] : 
+        img.get_current_path() + (img.get_current_path().ends_with("/") ? "" : "/") + source_path.filename().string()
+    );
+
     // Vemos se o arquivo alvo já existe na imagem. Só ver o nome é só suficiente, certo? :)
     auto [dst_path, dst_file] = Utils::split_path(dest_path);
-    auto [dst_inode, _] = img.resolve_path(dst_path, img.get_root_inode());
+    auto [dst_inode, dst_resolved_path] = img.resolve_path(dst_path, img.get_root_inode());
     if(std::ranges::any_of(img.list_dir(dst_inode), by_name(dst_file))) {
         std::println(std::cerr, "Arquivo alvo {} já existe na imagem.", dst_file);
         return 1;
@@ -295,10 +305,9 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
     // Abrimos o arquivo do SO para transferir como binário
     std::ifstream src_file_stream(source_path, std::ios::binary | std::ios::ate);
     if(!src_file_stream.is_open()) {
-        std::println(std::cerr, "Não foi possível abrir o arquivo alvo.");
-        return 1;    
+        std::println(std::cerr, "Erro ao abrir o arquivo do SO.");
+        return 1;
     }
-
     // Pegamos o tamanho do arquivo
     uint64_t file_size = static_cast<uint64_t>(src_file_stream.tellg());
     // Tentamos alocar blocos e criar a árvore de extents
@@ -343,24 +352,24 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
     new_inode.i_osd2.l_i_blocks_high = static_cast<uint16_t>((total_sectors >> 32) & MAX_16BIT);
 
     std::vector<Raw::ExtentLeaf> leafs{};
-    std::span<Raw::ExtentLeaf> leafs_span = Utils::as_span<Raw::ExtentLeaf>(leafs);
     uint32_t logical = 0, remaining = blocks_needed;
-
+    
     // Tentamos alocar blocos até não precisarmos mais e colocamos em folhas
     while(remaining > 0) {
         auto [allocated_blocks, start_block] = img.alloc_contiguous_blocks(remaining);
-
+        
         Raw::ExtentLeaf leaf{};
         leaf.ee_block = logical;
         leaf.ee_len = allocated_blocks;
         leaf.ee_start_lo = start_block;
         // Apostarei que nunca usaremos esse bits :)
         leaf.ee_start_hi = 0;
-
+        
         leafs.push_back(leaf);
         logical += allocated_blocks;
         remaining -= allocated_blocks;
     }
+    std::span<Raw::ExtentLeaf> leafs_span = Utils::as_span<Raw::ExtentLeaf>(leafs);
 
     Wrappers::Inode new_wrapper(
         new_inode_id,
@@ -433,8 +442,8 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
             // Monta o índice para colocar na raiz (i_block)
             Raw::ExtentIndex idx{
                 .ei_block = child_leafs[0].ee_block,
-                .ei_leaf_lo = static_cast<uint32_t>(child_blk & std::numeric_limits<uint32_t>().max()),
-                .ei_leaf_hi = static_cast<uint16_t>((child_blk >> 32) & std::numeric_limits<uint16_t>().max()),
+                .ei_leaf_lo = static_cast<uint32_t>(child_blk & MAX_32BIT),
+                .ei_leaf_hi = 0,  // uint32_t nunca tem bits acima de 31
             };
             root_indices.push_back(idx);
             leaf_offset += chunk_size;
@@ -471,16 +480,33 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
 
 short Command::to_out(Image &img, const std::span<const std::string> args) {
     const std::string source_path = args.size() > 1 ? args[1] : "";
-    const std::string dest_path = args.size() > 2 ? args[2] : "";
+    if (source_path.empty()) {
+        std::println(std::cerr, "Uso: export <arquivo da imagem> <diretório/arquivo no SO>");
+        return 1;
+    }
+    auto [src_path, src_file] = Utils::split_path(source_path);
+    // Vemos se o arquivo já existe no SO
+    // Usamos `std::filesystem` para ver se o arquivo está no SO perguntando ao SO
+    std::filesystem::path dest_path(args.size() > 2 ? args[2] : "");
 
-    if (source_path.empty() || dest_path.empty()) {
-        std::println(std::cerr, "Uso: export <arquivo da imagem> <diretório no SO>");
+    // O uso do operador  / é para colocar o separador de diretório do SO (só usaremos linux aqui, mas é mais semântico)
+    // Se não foi dado destino, usa o diretório atual do SO + nome do arquivo
+    if(dest_path.empty()) dest_path = std::filesystem::current_path() / src_file;
+    // Se foi dado um diretório existente, concatena o nome do arquivo
+    if(std::filesystem::is_directory(dest_path)) dest_path /= src_file;
+
+    // Agora sim checa se o arquivo final já existe
+    if(std::filesystem::exists(dest_path)) {
+        std::println(std::cerr, "Arquivo '{}' já existe no SO.", dest_path.string());
         return 1;
     }
 
     // Vemos se o arquivo alvo existe na imagem. Só ver o nome é só suficiente, certo? :)
-    auto [src_path, src_file] = Utils::split_path(source_path);
-    auto [src_inode, _] = img.resolve_path(src_path, img.get_current_inode());
+    auto [src_inode, src_resolved_path] = img.resolve_path(src_path, img.get_current_inode());
+    if(!src_inode.is_dir()) {
+        std::println(std::cerr, "Diretório alvo na verdade é um arquivo.");
+        return 1;
+    }
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(src_inode);
     auto target_entry = std::ranges::find_if(entries, by_name(src_file));
     if(target_entry == entries.end()) {
@@ -489,25 +515,14 @@ short Command::to_out(Image &img, const std::span<const std::string> args) {
     }
 
     Wrappers::Inode file_inode = img.get_inode(target_entry->get_inode());
-
-    auto [dst_path, dst_file] = Utils::split_path(dest_path);
-    std::string full_path = dst_path;
-    if(!full_path.empty() && full_path.back() != '/') full_path += '/';
-    full_path += dst_file.empty() ? src_file : dst_file;
-    // Vemos se o arquivo já existe no SO
-    // Seria mais seguro usar `std::filesystem` aqui, mas não quero deixar parecendo que usamos a STL para coisas mais profundas :)
-    if(std::ifstream test_file(full_path); test_file.is_open()) {
-        std::println(std::cerr, "Arquivo já existe no SO.");
-        return 1;
-    }
-
     // Abrimos o arquivo do SO para transferir como binário
-    std::ofstream dst_file_stream(full_path, std::ios::binary);
+    std::ofstream dst_file_stream(dest_path, std::ios::binary);
     if(!dst_file_stream.is_open()) {
         std::println(std::cerr, "Não foi possível abrir o arquivo alvo.");
         return 1; 
     }
 
+    // Colocamos os bytes no arquivo de destino
     std::vector<std::byte> file_bytes = img.read_file(file_inode);
     dst_file_stream.seekp(0, std::ios::beg);
     dst_file_stream.write(reinterpret_cast<char *>(file_bytes.data()), file_bytes.size());
@@ -531,7 +546,7 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
 
     // Pegamos o diretório
     auto [path, file_name] = Utils::split_path(file_path);
-    auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
+    auto [parent_dir, parent_resolved_path] = img.resolve_path(path, img.get_current_inode());
 
     // Vemos se o arquivo já existe. (Usamos ranges para iterar)
     if (std::ranges::any_of(img.list_dir(parent_dir), by_name(file_name))) {
@@ -599,6 +614,7 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
 
     // Separamos o diretório alvo do nome do diretório a ser criado
     auto [path, path_name] = Utils::split_path(dir_path);
+    auto [parent_dir, parent_resolved_path] = img.resolve_path(path, img.get_current_inode());
 
     // Pegamos o diretório pai onde o novo diretório será criado
     auto [parent_dir_inode, _] = img.resolve_path(path, img.get_current_inode());
@@ -746,7 +762,7 @@ short Command::rm(Image &img, const std::span<const std::string> args) {
     // Separamos o diretório alvo do nome do arquivo
     auto [path, file_name] = Utils::split_path(file_path);
     // Pegamos o diretório
-    auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
+    auto [parent_dir, parent_resolved_path] = img.resolve_path(path, img.get_current_inode());
 
     std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
 
@@ -782,6 +798,7 @@ short Command::rmdir(Image &img, const std::span<const std::string> args) {
 
     // Separamos o diretório alvo do nome do diretório a ser removido
     auto [path, path_name] = Utils::split_path(dir_path);
+    auto [parent_dir, parent_resolved_path] = img.resolve_path(path, img.get_current_inode());
 
     // Pegamos o diretório pai onde o diretório será removido
     auto [parent_dir_inode, _] = img.resolve_path(path, img.get_current_inode());
@@ -851,20 +868,20 @@ short Command::rename(Image &img, const std::span<const std::string> args) {
     // Separamos o diretório alvo do nome do arquivo
     auto [path, file_name] = Utils::split_path(file);
     // Agora pegamos o inode do diretório pai do alvo do arquivo
-    auto [parent_dir, _] = img.resolve_path(path, img.get_current_inode());
+    auto [parent_dir, parent_resolved_path] = img.resolve_path(path, img.get_current_inode());
     // Separamos também o diretório alvo do novo nome do arquivo
     auto [new_path, new_name] = Utils::split_path(new_file_name);
     // Pegamos também o diretório alvo do novo arquivo
-    auto [new_dir, _] = img.resolve_path(new_path, img.get_current_inode());
+    auto [new_dir, new_parent_resolved_path] = img.resolve_path(new_path, img.get_current_inode());
 
     // Vemos se o arquivo existe
-    if (std::ranges::any_of(img.list_dir(parent_dir), by_name(file_name))) {
+    if(std::ranges::none_of(img.list_dir(parent_dir), by_name(file_name))) {
         std::println(std::cerr, "Erro: '{}' não encontrado.", file_name);
         return 1;
     }
 
     // Vemos se já existe o arquivo alvo
-    if (std::ranges::any_of(img.list_dir(new_dir), by_name(new_name))) {
+    if(std::ranges::any_of(img.list_dir(new_dir), by_name(new_name))) {
         std::println(std::cerr, "Erro: '{}' já existe.", new_name);
         return 1;
     }
