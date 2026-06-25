@@ -158,9 +158,7 @@ public:
     uint32_t get_first_ino() const;
 
     /**
-     * @brief Número de inodes reservados por grupo para expansão da tabela de inodes.
-     * Inodes além de (inodes_per_group - itable_unused) estão disponíveis para uso.
-     * Relevante para alloc_inode nas operações de escrita.
+     * @brief Número de bytes que inodes têm após sua estrutura de 160 bytes.
      */
     uint16_t get_min_extra_isize() const;
 
