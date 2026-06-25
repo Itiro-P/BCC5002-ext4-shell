@@ -93,7 +93,7 @@ uint32_t build_extent_tree(
             // Criamos o índice apontando para esse filho
             Raw::ExtentIndex idx{
                 .ei_block = child_leafs[0].ee_block,
-                .ei_leaf_lo = static_cast<uint32_t>(child_phys_block & MAX_32BIT),
+                .ei_leaf_lo = child_phys_block,
                 .ei_leaf_hi = 0,  // uint32_t nunca tem bits acima de 31
             };
             index_entries.push_back(idx);
@@ -442,8 +442,8 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
             // Monta o índice para colocar na raiz (i_block)
             Raw::ExtentIndex idx{
                 .ei_block = child_leafs[0].ee_block,
-                .ei_leaf_lo = static_cast<uint32_t>(child_blk & MAX_32BIT),
-                .ei_leaf_hi = 0,  // uint32_t nunca tem bits acima de 31
+                .ei_leaf_lo = child_blk,
+                .ei_leaf_hi = 0,
             };
             root_indices.push_back(idx);
             leaf_offset += chunk_size;
