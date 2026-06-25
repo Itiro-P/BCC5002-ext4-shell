@@ -60,7 +60,7 @@ namespace Ext4::Wrappers {
         
         /**
          * @brief Retorna o offset do inode alvo.
-         * @param inode_um O número do inode.
+         * @param inode_num O número do inode.
          */
         std::streamoff get_inode_offset(const uint32_t inode_num);
         
@@ -143,10 +143,18 @@ namespace Ext4::Wrappers {
             return this->current_path;
         }
 
+        /**
+         * @brief Retorna o valor do UUID do volume.
+         * @returns O UUID do volume.
+         */
         std::string get_volume_uuid() const {
             return this->super_block.get_uuid();
         }
 
+        /**
+         * @brief Retorna o valor do UUID do volume em bytes.
+         * @returns O UUID do volume em bytes.
+         */
         std::span<const std::byte> get_volume_uuid_bytes() const {
             return this->super_block.get_uuid_bytes();
         }

@@ -99,7 +99,7 @@ public:
 
     /**
      * @brief Tamanho do bloco em bytes: 1024 << s_log_block_size.
-     * Valores possíveis: 1024, 2048, 409Usado em todo cálculo de offset.
+     * Valores possíveis: 1024, 2048, 4096. Usado em todo cálculo de offset.
      */
     uint32_t get_block_size() const;
 
