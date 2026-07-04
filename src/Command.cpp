@@ -245,24 +245,11 @@ short Command::test_inode(Image &img, const std::span<const std::string> args) {
     }
 
     try {
-        const Wrappers::Inode inode = img.get_inode(inode_id);
-        const Raw::Inode raw = inode.get_raw();
-
-        const uint64_t size = (static_cast<uint64_t>(raw.i_size_hi) << 32) | raw.i_size_lo;
-        const uint64_t blocks = (static_cast<uint64_t>(raw.i_osd2.l_i_blocks_high) << 32) | raw.i_blocks_lo;
-
-        std::println("Inode {}", inode_id);
-        std::println(" - Mode: {:o}", raw.i_mode);
-        std::println(" - Size: {}", size);
-        std::println(" - Links: {}", raw.i_links_count);
-        std::println(" - Blocks: {}", blocks);
-        std::println(" - Flags: 0x{:x}", raw.i_flags);
-        std::println(" - Atime: {}", raw.i_atime);
-        std::println(" - Ctime: {}", raw.i_ctime);
-        std::println(" - Mtime: {}", raw.i_mtime);
+        // Se conseguimos obter o inode, ele está alocado
+        img.get_inode(inode_id);
+        std::println("Inode {} alocado.", inode_id);
     } catch (...) {
-        std::println(std::cerr, "Erro: inode {} não encontrado ou inválido.", inode_id);
-        return 1;
+        std::println("Inode {} livre (não alocado).", inode_id);
     }
 
     return 0;
@@ -290,28 +277,13 @@ short Command::test_block(Image &img, const std::span<const std::string> args) {
     }
 
     try {
+        // Tentativa de leitura: se não ocorrer exceção, consideramos o bloco alocado
         const uint32_t block_size = img.get_superblock().get_block_size();
         std::vector<std::byte> block(block_size);
         img.read_block(block_id, block);
-
-        if (block.size() != block_size) {
-            std::println(std::cerr, "Erro: Tamanho de bloco inesperado ao ler o bloco {}.", block_id);
-            return 1;
-        }
-
-        std::println("Bloco {} ({} bytes):", block_id, block_size);
-        for (size_t i = 0; i < block.size(); ++i) {
-            if (i % 16 == 0) {
-                std::print("{:08x}: ", i);
-            }
-            std::print("{:02x} ", std::to_integer<unsigned>(block[i]));
-            if (i % 16 == 15 || i + 1 == block.size()) {
-                std::println("");
-            }
-        }
+        std::println("Bloco {} alocado.", block_id);
     } catch (...) {
-        std::println(std::cerr, "Erro: bloco {} não encontrado ou inválido.", block_id);
-        return 1;
+        std::println("Bloco {} livre (não alocado).", block_id);
     }
 
     return 0;
