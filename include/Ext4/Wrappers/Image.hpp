@@ -180,9 +180,30 @@ namespace Ext4::Wrappers {
          * @brief Lê os metadados de um inode específico do disco a partir do seu número global.
          * @param inode_num Número do inode (ex: 2 para o diretório raiz).
          * @returns Estrutura preenchida com os dados do disco Inode.
-         * @throws `std::runtime_error` se o Inode for inválido ou qualquer tipo de erro.
+         * @throws `std::runtime_error` ocorrer erros na leitura do inode.
          */
         Wrappers::Inode get_inode(const uint32_t inode_num);
+
+        /**
+         * @brief Retorna a lista de descritores de grupo lidos da imagem.
+         * @returns Um vetor contendo os descritores de grupo.
+         */
+        std::vector<Wrappers::GroupDescriptor> get_group_descriptors() const {
+            return this->group_descriptors;
+        }
+
+        /**
+         * @brief Retorna o descritor de grupo específico pelo índice.
+         * @param group_index O índice do grupo (0-based).
+         * @returns O `GroupDescriptor` correspondente ao índice fornecido.
+         * @throws `std::out_of_range` Se o índice fornecido estiver fora do intervalo da lista de descritores de grupo.
+         */
+        Wrappers::GroupDescriptor get_group_descriptor(const uint32_t group_index) const {
+            if (group_index >= this->group_descriptors.size()) {
+                throw std::out_of_range("Índice de grupo fora do intervalo.");
+            }
+            return this->group_descriptors[group_index];
+        }
 
         /**
          * @brief Obtém uma lista de blocos alocados para este Inode. Se o Inode utiliza extents, esta função irá decodificar a estrutura de extents para retornar os blocos físicos. Se o Inode utiliza blocos diretos/indiretos, esta função irá ler os blocos diretos e seguir os ponteiros de blocos indiretos conforme necessário.
