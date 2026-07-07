@@ -77,6 +77,7 @@ namespace Ext4::Wrappers {
          * @param block_num O número do bloco a ser lido.
          * @param buffer O buffer onde os dados lidos serão armazenados.
          * @throws `std::runtime_error` Se a quantidade de bytes lida for diferente do esperado ou se ocorrer um erro de leitura.
+         * @throws `std::out_of_range` se o número do inode levar a um inode livre.
          */
         void read_block(const uint64_t block_num, std::span<std::byte> buffer);
         
@@ -181,6 +182,7 @@ namespace Ext4::Wrappers {
          * @param inode_num Número do inode (ex: 2 para o diretório raiz).
          * @returns Estrutura preenchida com os dados do disco Inode.
          * @throws `std::runtime_error` ocorrer erros na leitura do inode.
+         * @throws `std::out_of_range` se o número do inode levar a um inode livre.
          */
         Wrappers::Inode get_inode(const uint32_t inode_num);
 

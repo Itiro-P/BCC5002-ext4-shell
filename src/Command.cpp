@@ -244,11 +244,18 @@ short Command::test_inode(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
+    // Inodes são numerados de 1 até s_inodes_count (inclusive)
+    const uint32_t max_inode_id = img.get_superblock().get_inodes_count();
+    if (inode_id < 1 || inode_id > max_inode_id) {
+        std::println(std::cerr, "Erro: ID de inode {} fora do intervalo válido (1 a {}).", inode_id, max_inode_id);
+        return 1;
+    }
+
     try {
         // Se conseguimos obter o inode, ele está alocado
         img.get_inode(inode_id);
         std::println("Inode {} alocado.", inode_id);
-    } catch (...) {
+    } catch (const std::out_of_range&) {
         std::println("Inode {} livre (não alocado).", inode_id);
     }
 
@@ -276,13 +283,21 @@ short Command::test_block(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
+    // Blocos são numerados de 0 até total_blocks - 1
+    const auto &sb = img.get_superblock();
+    const uint64_t total_blocks = sb.get_blocks_count();
+    if (block_id >= total_blocks) {
+        std::println(std::cerr, "Erro: ID de bloco {} fora do intervalo válido (0 a {}).", block_id, total_blocks - 1);
+        return 1;
+    }
+
     try {
         // Tentativa de leitura: se não ocorrer exceção, consideramos o bloco alocado
         const uint32_t block_size = img.get_superblock().get_block_size();
         std::vector<std::byte> block(block_size);
-        img.read_block(block_id, block);
+        img.read_block(block_id, Utils::as_byte_span(block));
         std::println("Bloco {} alocado.", block_id);
-    } catch (...) {
+    } catch (const std::out_of_range&) {
         std::println("Bloco {} livre (não alocado).", block_id);
     }
 

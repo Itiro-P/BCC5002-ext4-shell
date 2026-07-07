@@ -5,6 +5,7 @@
 #include <vector>
 #include <span>
 #include <optional>
+#include <cstddef>
 #include "../../Ext4/Raw.hpp"
 
 namespace Ext4::Wrappers {
@@ -50,7 +51,22 @@ namespace Ext4::Wrappers {
          * @brief Retorna o checksum dos metadados gravados (caso tenha)
          */
         uint32_t get_checksum() const {
-            return Utils::concatenate(this->raw.i_osd2.l_i_checksum_lo, this->raw.i_checksum_hi);
+            if (this->has_checksum_hi()) {
+                return Utils::concatenate(this->raw.i_osd2.l_i_checksum_lo, this->raw.i_checksum_hi);
+            }
+            return static_cast<uint32_t>(this->raw.i_osd2.l_i_checksum_lo);
+        }
+
+        /**
+         * @brief Verifica se o inode possui o campo de checksum superior (i_checksum_hi) válido, baseado no tamanho extra do inode.
+         * @returns `true` se o inode possui o campo de checksum superior válido, `false` caso contrário.
+         */
+        bool has_checksum_hi() const {
+            constexpr size_t HI_REQUIRED_EXTRA_ISIZE = 
+                offsetof(Ext4::Raw::Inode, i_checksum_hi) 
+                - offsetof(Ext4::Raw::Inode, i_extra_isize) 
+                + sizeof(this->raw.i_checksum_hi);
+            return this->raw.i_extra_isize >= HI_REQUIRED_EXTRA_ISIZE;
         }
 
         /**

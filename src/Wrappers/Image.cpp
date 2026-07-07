@@ -114,6 +114,26 @@ void Wrappers::Image::read_offset(const std::streamoff offset, std::span<std::by
 }
 
 void Wrappers::Image::read_block(const uint64_t block_num, std::span<std::byte> buffer) {
+    // Primeiro, vemos se estamos lendo um bloco válido. Se não for, lançamos exceção.
+    if (block_num < this->super_block.get_first_data_block() || block_num >= this->super_block.get_blocks_count()) {
+        throw std::out_of_range(std::format("Erro: O bloco de ID {} está fora dos limites válidos do sistema de arquivos.", block_num));
+    }
+    try {
+        Wrappers::GroupDescriptor gd = this->get_group_descriptor(this->get_block_group(block_num));
+        uint32_t bit_pos = this->get_block_bit_pos(block_num);
+        uint32_t bitmap_block = gd.get_block_bitmap_block();
+        std::vector<std::byte> bitmap_buffer(this->super_block.get_block_size());
+        auto bitmap_span = Utils::as_byte_span(bitmap_buffer);
+        this->read_offset(bitmap_block * this->super_block.get_block_size(), bitmap_span);
+        if (!Utils::test_bit(bitmap_span, bit_pos)) {
+            throw std::out_of_range(std::format("O bloco de ID {} está livre e não pode ser lido.", block_num));
+        } else if(gd.is_block_uninit()) {
+            throw std::out_of_range(std::format("O bloco de ID {} pertence a um grupo de blocos não inicializado.", block_num));
+        }
+    } catch (const std::out_of_range&) {
+        throw std::out_of_range(std::format("O bloco de ID {} pertence a um grupo de descritores não existente.", block_num));
+    }
+
     // O deslocamento que se encontra o bloco vem do fato do EXT4 usar alocação contígua.
     // Então multiplicamos o número do bloco pelo tamanho de um bloco para saber sua posição no disco.
     std::streamoff offset = block_num * this->super_block.get_block_size();
@@ -195,6 +215,23 @@ std::streamoff Ext4::Wrappers::Image::get_inode_offset(const uint32_t inode_num)
 }
 
 Wrappers::Inode Wrappers::Image::get_inode(const uint32_t inode_num) {
+    // Primeiro, validamos se o inode está livre ou não. Se estiver livre, lançamos exceção.
+    try {
+        Wrappers::GroupDescriptor gd = this->get_group_descriptor(this->get_inode_group(inode_num));
+        uint32_t bit_pos = this->get_inode_bit_pos(inode_num);
+        uint32_t bitmap_block = gd.get_inode_bitmap_block();
+        std::vector<std::byte> bitmap_buffer(this->super_block.get_block_size());
+        auto bitmap_span = Utils::as_byte_span(bitmap_buffer);
+        this->read_block(bitmap_block, bitmap_span);
+        if (!Utils::test_bit(bitmap_span, bit_pos)) {
+            throw std::out_of_range(std::format("O inode de ID {} está livre e não pode ser lido.\n", inode_num));
+        } else if(gd.is_inode_uninit()) {
+            throw std::out_of_range(std::format("O inode de ID {} pertence a um grupo de blocos não inicializado.", inode_num));
+        }
+    } catch (const std::out_of_range&) {
+        throw std::out_of_range(std::format("O inode de ID {} pertence a um grupo de descritores não existente.", inode_num));
+    }
+
     // Alocar a struct e ler do disco
     // Normalmente, leríamos o tamanho indicado pelo superbloco.
     // PORÉM, os bytes excedentes da estrutura não têm semântica fixa e apenas mapeias funcionalidades opcionais
@@ -215,10 +252,17 @@ Wrappers::Inode Wrappers::Image::get_inode(const uint32_t inode_num) {
     Wrappers::Inode wrapper = Wrappers::Inode(inode_num, this->get_volume_uuid(), this->super_block.get_inode_size(), inode, excess_bytes);
 
     // Checagem de checksums
-    if (this->super_block.has_metadata_csum()) {
+    if(this->super_block.has_metadata_csum()) {
+        uint32_t calculated = Checksums::checksum_inode(wrapper, this->super_block.get_checksum_seed());
+        uint32_t stored = wrapper.get_checksum();
+
+        bool has_checksum_hi = wrapper.has_checksum_hi();
+
+        uint32_t expected = has_checksum_hi ? calculated : (calculated & 0xFFFF);
+
         Checksums::validate_checksum(
-            wrapper.get_checksum(), 
-            Checksums::checksum_inode(wrapper, this->super_block.get_checksum_seed()),
+            stored,
+            expected,
             std::format("Inode de ID {}", wrapper.get_inode_id())
         );
     }
