@@ -7,6 +7,9 @@
 #include <cstring>
 #include <cmath>
 #include <filesystem>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 
 /**
  * @file    Command.cpp
@@ -125,6 +128,69 @@ uint32_t build_extent_tree(
     return blk_id;
 }
 
+/**
+ * @brief Formata um timestamp Unix (uint32_t) em uma string legível "AAAA-MM-DD HH:MM:SS".
+ * Se o timestamp for 0, retorna "-" (indicando campo não usado/vazio).
+ */
+static std::string format_time(const uint32_t timestamp) {
+    if (timestamp == 0) return "-";
+    std::time_t tt = static_cast<std::time_t>(timestamp);
+    std::tm tm_buf{};
+    localtime_r(&tt, &tm_buf);
+    std::ostringstream ss;
+    ss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+/**
+ * @brief Converte o campo i_mode em uma string estilo `ls -l` (ex: "drwxr-xr-x").
+ */
+static std::string mode_to_string(const uint16_t mode) {
+    std::string result(10, '-');
+
+    switch (mode & Constants::S_IFMT) {
+        case Flags::S_IFDIR:  result[0] = 'd'; break;
+        case Flags::S_IFLNK:  result[0] = 'l'; break;
+        case Flags::S_IFCHR:  result[0] = 'c'; break;
+        case Flags::S_IFBLK:  result[0] = 'b'; break;
+        case Flags::S_IFIFO:  result[0] = 'p'; break;
+        case Flags::S_IFSOCK: result[0] = 's'; break;
+        default:              result[0] = '-'; break;
+    }
+
+    if (mode & Flags::S_IRUSR) result[1] = 'r';
+    if (mode & Flags::S_IWUSR) result[2] = 'w';
+    if (mode & Flags::S_IXUSR) result[3] = 'x';
+    if (mode & Flags::S_IRGRP) result[4] = 'r';
+    if (mode & Flags::S_IWGRP) result[5] = 'w';
+    if (mode & Flags::S_IXGRP) result[6] = 'x';
+    if (mode & Flags::S_IROTH) result[7] = 'r';
+    if (mode & Flags::S_IWOTH) result[8] = 'w';
+    if (mode & Flags::S_IXOTH) result[9] = 'x';
+
+    if (mode & Flags::S_ISUID) result[3] = (result[3] == 'x') ? 's' : 'S';
+    if (mode & Flags::S_ISGID) result[6] = (result[6] == 'x') ? 's' : 'S';
+    if (mode & Flags::S_ISVTX) result[9] = (result[9] == 'x') ? 't' : 'T';
+
+    return result;
+}
+
+/**
+ * @brief Retorna uma descrição textual do tipo de arquivo a partir do campo i_mode.
+ */
+static std::string_view type_to_string(const uint16_t mode) {
+    switch (mode & Constants::S_IFMT) {
+        case Flags::S_IFDIR:  return "Diretório";
+        case Flags::S_IFREG:  return "Arquivo regular";
+        case Flags::S_IFLNK:  return "Link simbólico";
+        case Flags::S_IFCHR:  return "Dispositivo de caracteres";
+        case Flags::S_IFBLK:  return "Dispositivo de blocos";
+        case Flags::S_IFIFO:  return "FIFO";
+        case Flags::S_IFSOCK: return "Socket";
+        default:               return "Desconhecido";
+    }
+}
+
 short Command::help() {
     for (const auto &[cmd, desc] : Command::command_info) {
         std::println("- {:<32} - {}", cmd, desc);
@@ -133,6 +199,65 @@ short Command::help() {
 }
 
 short Command::info(Image &img) {
+    Wrappers::SuperBlock sb = img.get_superblock();
+
+    std::println("=== Informações do Sistema de Arquivos ===");
+    std::println("Nome do volume:            {}", sb.get_volume_name());
+    std::println("UUID:                      {}", sb.get_uuid());
+    std::println("Estado:                    {}", sb.get_state() == Flags::SuperBlockFlags::FS_STATE_CLEARLY_UNMOUNTED ? "Limpo" : "Com erros/Sujo");
+    std::println("Nível de revisão:          {}", sb.get_rev_level());
+    std::println();
+
+    std::println("Suporte a 64 bits:         {}", sb.is_64bit() ? "Sim" : "Não");
+    std::println("Suporte a extents:         {}", sb.has_extents() ? "Sim" : "Não");
+    std::println("Diretórios com HTree:      {}", sb.has_dir_htree() ? "Sim" : "Não");
+    // std::println("Arquivos grandes (>2GiB):  {}", sb.has_large_file() ? "Sim" : "Não");
+    // std::println("Arquivos enormes:          {}", sb.has_huge_file() ? "Sim" : "Não");
+    std::println("Checksum de metadados:     {}", sb.has_metadata_csum() ? "Sim" : "Não");
+    std::println("Checksum de GDT (legado):  {}", sb.has_compat_gdt_csum() ? "Sim" : "Não");
+    std::println();
+
+    std::println("Tamanho do bloco:          {} bytes", sb.get_block_size());
+    std::println("Tamanho do inode:          {} bytes", sb.get_inode_size());
+    std::println("Tamanho do descritor:      {} bytes", sb.get_desc_size());
+    std::println("Primeiro bloco de dados:   {}", sb.get_first_data_block());
+    std::println("Blocos por grupo:          {}", sb.get_blocks_per_group());
+    std::println("Inodes por grupo:          {}", sb.get_inodes_per_group());
+    std::println("Clusters por grupo:        {}", sb.get_clusters_per_group());
+    std::println("Quantidade de grupos:      {}", sb.get_group_count());
+    std::println();
+
+    std::println("Total de inodes:           {}", sb.get_inodes_count());
+    std::println("Inodes livres:             {}", sb.get_free_inodes_count());
+    std::println("Primeiro inode não-reserv.: {}", sb.get_first_ino());
+    std::println();
+
+    std::println("Total de blocos:           {}", sb.get_blocks_count());
+    std::println("Blocos livres:             {}", sb.get_free_blocks_count());
+    std::println("Blocos reservados (root):  {}", sb.get_reserved_blocks_count());
+    std::println();
+
+    std::println("Criado:                    {}", format_time(sb.get_mkfs_time()));
+    std::println("Última montagem:           {}", format_time(sb.get_mtime()));
+    std::println("Última escrita:            {}", format_time(sb.get_wtime()));
+    std::println("Última verificação:        {}", format_time(sb.get_lastcheck()));
+    std::println("Contagem de montagens:     {} / {}", sb.get_mnt_count(), sb.get_max_mnt_count());
+    std::println();
+
+    std::println("=== Grupos de Blocos ({} grupo(s)) ===", sb.get_group_count());
+    for (const Wrappers::GroupDescriptor &gd : img.get_group_descriptors()) {
+        std::println("--- Grupo {} ---", gd.get_group_number());
+        std::println("  Bitmap de blocos (bloco):  {}", gd.get_block_bitmap_block());
+        std::println("  Bitmap de inodes (bloco):  {}", gd.get_inode_bitmap_block());
+        std::println("  Tabela de inodes (bloco):  {}", gd.get_inode_table_block());
+        std::println("  Blocos livres:             {}", gd.get_free_blocks_count());
+        std::println("  Inodes livres:             {}", gd.get_free_inodes_count());
+        std::println("  Inodes não utilizados:     {}", gd.get_itable_unused());
+        std::println("  Diretórios neste grupo:    {}", gd.get_used_dirs_count());
+        std::println("  Flags:                     0x{:04x} (INODE_UNINIT={}, BLOCK_UNINIT={})",
+            gd.get_flags(), gd.is_inode_uninit(), gd.is_block_uninit());
+    }
+
     return 0;
 }
 
@@ -180,7 +305,64 @@ short Command::attr(Image &img, const std::span<const std::string> args) {
         return 1;
     }
 
-    // necessário implementar
+    Wrappers::Inode target_inode;
+    std::string display_name;
+    uint32_t inode_id;
+
+    // Caso especial: a raiz não possui uma entrada de diretório "visível" em si mesma dentro do pai
+    if (target_path == "/") {
+        target_inode = img.get_root_inode();
+        display_name = "/";
+        inode_id = target_inode.get_inode_id();
+    } else {
+        // Separamos o diretório do nome do alvo
+        auto [path, name] = Utils::split_path(target_path);
+        // Resolvemos o diretório pai
+        auto [parent_dir, resolved_path] = img.resolve_path(path, img.get_current_inode());
+
+        std::vector<Wrappers::DirectoryEntry> entries = img.list_dir(parent_dir);
+        auto target = std::ranges::find_if(entries, by_name(name));
+
+        if (target == entries.end()) {
+            std::println(std::cerr, "Erro: '{}' não encontrado.", name);
+            return 1;
+        }
+
+        inode_id = target->get_inode();
+        target_inode = img.get_inode(inode_id);
+        display_name = name;
+    }
+
+    const uint16_t mode = target_inode.get_mode();
+    const Wrappers::SuperBlock sb = img.get_superblock();
+
+    std::println("=== Atributos de '{}' ===", display_name);
+    std::println("Inode:                     {}", inode_id);
+    std::println("Tipo:                      {}", type_to_string(mode));
+    std::println("Permissões:                {} (0{:o})", mode_to_string(mode), mode & 0xFFF);
+    std::println("UID:                       {}", target_inode.get_uid());
+    std::println("GID:                       {}", target_inode.get_gid());
+    std::println("Tamanho:                   {} bytes", target_inode.get_size());
+    std::println("Contagem de links:         {}", target_inode.get_links_count());
+    std::println("Blocos alocados (512B):    {}", target_inode.get_raw().i_blocks_lo);
+    std::println("Geração:                   {}", target_inode.get_inode_generation());
+    std::println();
+
+    std::println("Último acesso:             {}", format_time(target_inode.get_atime()));
+    std::println("Última modificação:        {}", format_time(target_inode.get_mtime()));
+    std::println("Última alteração (ctime):  {}", format_time(target_inode.get_ctime()));
+    std::println();
+
+    std::println("Usa extents:               {}", target_inode.has_extents() ? "Sim" : "Não");
+    std::println("Flags (i_flags):           0x{:08x}", target_inode.get_flags());
+
+    if (sb.has_metadata_csum()) {
+        uint32_t seed = sb.get_checksum_seed();
+        uint32_t calc_checksum = Checksums::checksum_inode(target_inode, seed);
+        std::println("Checksum gravado:          0x{:08x}", target_inode.get_checksum());
+        std::println("Checksum calculado:        0x{:08x}", calc_checksum);
+        std::println("Checksum válido:           {}", target_inode.get_checksum() == calc_checksum ? "Sim" : "Não");
+    }
 
     return 0;
 }
