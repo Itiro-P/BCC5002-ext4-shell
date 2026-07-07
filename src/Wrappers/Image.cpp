@@ -597,17 +597,23 @@ uint32_t Ext4::Wrappers::Image::alloc_inode(const bool is_dir) {
         }
 
         std::vector<std::byte> inode_bitmap(this->super_block.get_block_size());
-        std::span<std::byte> full_span = Utils::as_byte_span(inode_bitmap); // bloco inteiro para leitura
-        this->read_block(gds[i].get_inode_bitmap_block(), full_span);
+        std::span<std::byte> full_span = Utils::as_byte_span(inode_bitmap);
         // Nem sempre o bloco inteiro é de bitmaps, então dividimos por `inode_per_group` para descobrir até onde vão os bits válidos
         auto bitmap_span = full_span.subspan(0, this->super_block.get_inodes_per_group() / 8);
-        // Checagem de checksums
-        if (this->super_block.has_metadata_csum()) {
-            Checksums::validate_checksum(
-                gds[i].get_inode_bitmap_checksum(),
-                Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()),
-                std::format("Checksum para o bitmap de inodes do GDT {}", i)
-            );
+
+        if (gds[i].is_inode_uninit()) {
+            // Bitmap "virtual": todos os inodes deste grupo estão livres.
+            // Não lemos do disco (pode ser lixo) nem validamos checksum ainda.
+            std::fill(bitmap_span.begin(), bitmap_span.end(), std::byte{0});
+        } else {
+            this->read_block(gds[i].get_inode_bitmap_block(), full_span);
+            if (this->super_block.has_metadata_csum()) {
+                Checksums::validate_checksum(
+                    gds[i].get_inode_bitmap_checksum(),
+                    Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()),
+                    std::format("Checksum para o bitmap de inodes do GDT {}", i)
+                );
+            }
         }
         // Iteramos BIT-A-BIT para achar um bit zerado
         for (size_t j = 0; j < bitmap_span.size() * 8; ++j) {
@@ -648,9 +654,13 @@ uint32_t Ext4::Wrappers::Image::alloc_inode(const bool is_dir) {
     }
 
     // Caso seja um diretório, temos que incrementar o contador de diretórios do GDT
-    if (is_dir) {
+    if(is_dir) {
         uint32_t used_dirs_count = to_change.get_used_dirs_count() + 1;
         Utils::split(used_dirs_count, new_raw.bg_used_dirs_count_lo, new_raw.bg_used_dirs_count_hi);
+    }
+
+    if(to_change.is_inode_uninit()) {
+        new_raw.bg_flags &= ~Ext4::Flags::BG_INODE_UNINIT; // limpa o bit da flag
     }
 
     to_change.set_raw(new_raw);
@@ -674,10 +684,10 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
 
     // Procuramos pelo primeiro grupo de descritores que contém 1 bit desativado em seu bitmap
     for (size_t i = 0; i < gds.size(); i++) {
-        if (stop) break;
-        if (gds[i].is_block_uninit()) {
-            // O bitmap de inodes deste grupo não está inicializado no disco.
-            // Pule para evitar erro de checksum.
+        if(stop) break;
+        if(gds[i].is_block_uninit()) {
+            // O bitmap de blocos deste grupo não está inicializado no disco.
+            // Pulamos para evitar erro de checksum.
             continue; 
         }
 
@@ -751,8 +761,8 @@ std::pair<uint32_t, uint32_t> Ext4::Wrappers::Image::alloc_contiguous_blocks(con
     // Busca o melhor grupo
     for (size_t i = 0; i < gds.size(); i++) {
         if (gds[i].is_block_uninit()) {
-            // O bitmap de inodes deste grupo não está inicializado no disco.
-            // Pule para evitar erro de checksum.
+            // O bitmap de blocos deste grupo não está inicializado no disco.
+            // Pulamos para evitar erro de checksum.
             continue; 
         }
         std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
