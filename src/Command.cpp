@@ -45,6 +45,7 @@ uint32_t build_extent_tree(
     std::span<Raw::ExtentLeaf> leafs
 ) {
     uint32_t blk_id = img.alloc_block();
+    if(blk_id == 0) return 0; // Sem espaço: nenhum bloco livre disponível.
     uint32_t block_size = img.get_superblock().get_block_size();
     std::vector<std::byte> buf(block_size);
     std::span<std::byte> buf_bytes = Utils::as_byte_span(buf);
@@ -544,6 +545,11 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
     uint32_t new_inode_id = img.alloc_inode();
     uint32_t now = static_cast<uint32_t>(std::time(nullptr));
     
+    if(new_inode_id == 0) {
+        std::println(std::cerr, "Erro: Não foi possível alocar um novo inode. A imagem está provavelmente cheia.");
+        return 1;
+    }
+
     // Inicializa o inode
     Raw::Inode new_inode{
         .i_mode  = Flags::InodeMode::S_IFREG | 0644,  // arquivo regular + permissões 644
@@ -751,7 +757,7 @@ short Command::pwd(Image &img) {
 short Command::touch(Image &img, const std::span<const std::string> args) {
     const std::string file_path = args.size() > 1 ? args[1] : "";
 
-    if (file_path.empty()) {
+    if(file_path.empty()) {
         std::println(std::cerr, "Uso: touch <arquivo>");
         return 1;
     }
@@ -760,8 +766,15 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
     auto [path, file_name] = Utils::split_path(file_path);
     auto [parent_dir, parent_resolved_path] = img.resolve_path(path, img.get_current_inode());
 
+    // Antes de mais nada, temos que ver se não temos um nome de arquivo muito grande.
+    // O campo `name_len` do diretório é um uint8_t, então o tamanho máximo de um nome de arquivo é 255 bytes.
+    if(file_name.size() > std::numeric_limits<uint8_t>::max()) {
+        std::println(std::cerr, "Erro: Nome de arquivo muito grande ({} bytes). Máximo permitido: {} bytes.", file_name.size(), std::numeric_limits<uint8_t>::max());
+        return 1;
+    }
+
     // Vemos se o arquivo já existe. (Usamos ranges para iterar)
-    if (std::ranges::any_of(img.list_dir(parent_dir), by_name(file_name))) {
+    if(std::ranges::any_of(img.list_dir(parent_dir), by_name(file_name))) {
         std::println(std::cerr, "Erro: Arquivo '{}' já existe.", file_name);
         return 1;
     }
@@ -769,6 +782,11 @@ short Command::touch(Image &img, const std::span<const std::string> args) {
     // Alocamos um inode e criamos a estrutura para escrita
     uint32_t new_inode_id = img.alloc_inode();
     uint32_t now = static_cast<uint32_t>(std::time(nullptr));
+
+    if(new_inode_id == 0) {
+        std::println(std::cerr, "Erro: Não foi possível alocar um novo inode. A imagem está provavelmente cheia.");
+        return 1;
+    }
 
     // Inicializa o inode
     Raw::Inode new_inode{
@@ -828,6 +846,13 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
     auto [path, path_name] = Utils::split_path(dir_path);
     auto [parent_dir, parent_resolved_path] = img.resolve_path(path, img.get_current_inode());
 
+    // Antes de mais nada, temos que ver se não temos um nome de arquivo muito grande.
+    // O campo `name_len` do diretório é um `uint8_t`, então o tamanho máximo de um nome de arquivo é 255 bytes.
+    if(path_name.size() > std::numeric_limits<uint8_t>::max()) {
+        std::println(std::cerr, "Erro: Nome de diretório muito grande ({} bytes). Máximo permitido: {} bytes.", path_name.size(), std::numeric_limits<uint8_t>::max());
+        return 1;
+    }
+
     // Verificamos se já existe um diretório ou arquivo com o mesmo nome no diretório pai
     if(std::ranges::any_of(img.list_dir(parent_dir), by_name(path_name))) {
         std::println("Já existe um arquivo ou diretório com o nome '{}'.", path_name);
@@ -868,6 +893,10 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
 
     // Alocamos um bloco
     uint32_t id_block = img.alloc_block();
+    if(id_block == 0) {
+        std::println(std::cerr, "Erro: Não foi possível alocar um novo bloco. A imagem está provavelmente cheia ou só restam blocos não inicializados.");
+        return 1;
+    }
 
     // Criamos a folha de extent correspondente ao bloco alocado
     Raw::ExtentLeaf leaf{
@@ -879,6 +908,11 @@ short Command::mkdir(Image &img, const std::span<const std::string> args) {
 
     // Alocamos um inode
     uint32_t id_inode = img.alloc_inode(true);
+
+    if(id_inode == 0) {
+        std::println(std::cerr, "Erro: Não foi possível alocar um novo inode. A imagem está provavelmente cheia.");
+        return 1;
+    }
     
     // Escrevemos o novo inode na imagem
     // Começamos pelo cabeçalho de extent

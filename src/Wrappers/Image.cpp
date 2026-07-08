@@ -636,12 +636,12 @@ uint32_t Ext4::Wrappers::Image::alloc_inode(const bool is_dir) {
         }
     }
 
-    if (!stop) throw std::runtime_error("Sem espaço: nenhum inode livre disponível.");
+    if(!stop) return 0; // Sem espaço: nenhum inode livre disponível.
 
     // Atualizamos as estruturas relacionadas (decrementamos a quantidade de inodes livres)
     Wrappers::GroupDescriptor to_change = gds[gd_id];
     Raw::GroupDescriptor new_raw = to_change.get_raw();
-    if (this->super_block.has_metadata_csum())
+    if(this->super_block.has_metadata_csum())
         Utils::split(new_bitmap_csum, new_raw.bg_inode_bitmap_csum_lo, new_raw.bg_inode_bitmap_csum_hi);
     
     uint32_t new_inode_count = to_change.get_free_inodes_count() - 1;
@@ -727,12 +727,12 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
         }
     }
 
-    if (!stop) throw std::runtime_error("Sem espaço: nenhum bloco livre disponível.");
+    if(!stop) return 0; // Sem espaço: nenhum bloco livre disponível.
 
     // Atualizamos as estruturas relacionadas (decrementamos a quantidade de blocos livres)
     Wrappers::GroupDescriptor to_change = gds[gd_id];
     Raw::GroupDescriptor new_raw = to_change.get_raw();
-    if (this->super_block.has_metadata_csum())
+    if(this->super_block.has_metadata_csum())
         Utils::split(new_bitmap_csum, new_raw.bg_block_bitmap_csum_lo, new_raw.bg_block_bitmap_csum_hi);
 
     uint32_t new_block_count = to_change.get_free_blocks_count() - 1;
@@ -981,7 +981,7 @@ void Ext4::Wrappers::Image::dir_add_entry(const Wrappers::Inode &dir_inode, uint
     if (dir_inode.get_inode_id() < 1 || target_ino < 1 || name.empty()) return;
   
     std::vector<Wrappers::DirectoryEntry> entries = this->list_dir(dir_inode);
-    if (entries.empty()) throw std::runtime_error("Diretório pai corrompido ou vazio.");
+    if(entries.empty()) return;
 
     // Descobrir em qual bloco físico a última entrada reside
     uint64_t last_entry_logical_offset = this->entry_logical_offset(Utils::as_span<Wrappers::DirectoryEntry>(entries), entries.size() - 1);
