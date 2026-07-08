@@ -70,6 +70,18 @@ bool Ext4::Wrappers::SuperBlock::has_compat_gdt_csum() const {
     return raw.s_feature_ro_compat  &Flags::SuperBlockFlags::RoCompatFeature::RO_COMPAT_GDT_CSUM;
 }
 
+bool Ext4::Wrappers::SuperBlock::has_sparse_superblock() const {
+    return raw.s_feature_ro_compat  &Flags::SuperBlockFlags::RoCompatFeature::RO_COMPAT_SPARSE_SUPER;
+}
+
+bool Ext4::Wrappers::SuperBlock::has_flex_bg() const {
+    return raw.s_feature_incompat &Flags::SuperBlockFlags::IncompatFeature::INCOMPAT_FLEX_BG;
+}
+
+uint16_t Ext4::Wrappers::SuperBlock::get_reserved_gdt_blocks() const {
+    return raw.s_reserved_gdt_blocks;
+}
+
 uint32_t Ext4::Wrappers::SuperBlock::get_inodes_count() const {
     return raw.s_inodes_count;
 }

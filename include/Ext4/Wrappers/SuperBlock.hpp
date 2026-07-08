@@ -17,7 +17,7 @@ public:
     SuperBlock(const Raw::SuperBlock &raw_super_block);
 
     /**
-     * @brief Retorna a estrutura vinculada ao Wrappers
+     * @brief Retorna a estrutura vinculada ao Wrapper
      */
     Raw::SuperBlock get_raw() const;
 
@@ -66,6 +66,21 @@ public:
      * @brief Indica se checksums de descritores de grupo estão ativos (`RO_COMPAT_GDT_CSUM`).
      */
     bool has_compat_gdt_csum() const;
+
+    /**
+     * @brief Indica se o superbloco tem backups dele mesmo em outros blocos.
+     */
+    bool has_sparse_superblock() const;
+
+    /**
+     * @brief Indica se a imagem tem a flag `flex_bg` ativa, permitindo que grupos de blocos tenham informações próximas entre si.
+     */
+    bool has_flex_bg() const;
+
+    /**
+     * @brief Retorna o número de blocos reservados para grupos de descritores.
+     */
+    uint16_t get_reserved_gdt_blocks() const;
 
     /**
      * @brief Total de inodes no filesystem.

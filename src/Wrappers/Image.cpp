@@ -93,6 +93,111 @@ void Wrappers::Image::seek(const std::streamoff offset) {
     }
 }
 
+bool Ext4::Wrappers::Image::is_superblock_backup(const uint32_t group_num) const {
+    bool sparse_block_enabled = this->get_superblock().has_sparse_superblock();
+    // Se a feature sparse_super não estiver ativa, todos os grupos têm backup.
+    if(!sparse_block_enabled) return true;
+    
+    // Grupos 0 e 1 sempre têm backup na regra sparse_super
+    if (group_num <= 1) {
+        return true;
+    }
+
+    auto is_power_of = [](uint32_t n, uint32_t base) {
+        if (n == 0) return false;
+        while (n % base == 0) n /= base;
+        return n == 1;
+    };
+
+    return is_power_of(group_num, 3) || is_power_of(group_num, 5) || is_power_of(group_num, 7);
+}
+
+bool Ext4::Wrappers::Image::is_flex_metadata_block(const uint64_t block_num) const {
+    // Pegando as métricas corretas do superbloco
+    uint32_t inodes_per_group = this->get_superblock().get_inodes_per_group();
+    uint32_t inode_size = this->get_superblock().get_inode_size();
+    uint32_t block_size = this->get_superblock().get_block_size();
+
+    // Calculando a quantidade de blocos que a tabela de inodes ocupa
+    uint32_t itable_blocks = (inodes_per_group * inode_size + block_size - 1) / block_size;
+
+    for(const auto &gd : this->group_descriptors) {
+        if (block_num == gd.get_block_bitmap_block()) return true;
+        if (block_num == gd.get_inode_bitmap_block()) return true;
+        
+        uint64_t it_start = gd.get_inode_table_block();
+        uint64_t it_end = it_start + itable_blocks;
+        
+        if (block_num >= it_start && block_num < it_end) return true;
+    }
+    return false;
+}
+
+void Ext4::Wrappers::Image::init_group_descriptor_block(const uint32_t group_id, std::span<std::byte> bitmap_span, std::span<Wrappers::GroupDescriptor> gds) {
+    std::fill(bitmap_span.begin(), bitmap_span.end(), std::byte{0});
+
+    uint32_t blocks_per_group = this->get_superblock().get_blocks_per_group();
+    uint64_t first_block = this->super_block.get_first_data_block() + group_id * blocks_per_group;
+    uint64_t group_end_block = first_block + blocks_per_group;
+
+    // Marca Superbloco e GDT
+    if(this->is_superblock_backup(group_id)) {
+        uint32_t num_groups = static_cast<uint32_t>(gds.size());
+        uint32_t desc_size = gds[group_id].get_desc_size();
+        uint32_t block_size = this->get_superblock().get_block_size();
+
+        uint64_t current_gdt_blocks = (static_cast<uint64_t>(num_groups) * desc_size + block_size - 1) / block_size;
+        uint64_t reserved_gdt_blocks = this->get_superblock().get_reserved_gdt_blocks();
+
+        uint64_t offset = 1 + current_gdt_blocks + reserved_gdt_blocks;
+        for(uint64_t k = 0; k < offset; ++k) Utils::set_bit(bitmap_span, k, 1);
+    }
+
+    // Função lambda auxiliar para marcar o bloco no bitmap se ele pertencer a este grupo
+    auto mark_if_local = [&](uint64_t block_address) {
+        if(block_address >= first_block && block_address < group_end_block) {
+            Utils::set_bit(bitmap_span, block_address - first_block, 1);
+        }
+    };
+
+    // Lendo os ponteiros do Descritor de Grupo atual
+    const Wrappers::GroupDescriptor& current_gd = gds[group_id];
+    uint64_t block_bitmap_blk = current_gd.get_block_bitmap_block();
+    uint64_t inode_bitmap_blk = current_gd.get_inode_bitmap_block();
+    uint64_t inode_table_blk = current_gd.get_inode_table_block();
+
+    // Marcando Block Bitmap e Inode Bitmap
+    mark_if_local(block_bitmap_blk);
+    mark_if_local(inode_bitmap_blk);
+
+    // Marcando a Tabela de Inodes (calculando a quantidade de blocos que ela ocupa)
+    uint32_t inodes_per_group = this->get_superblock().get_inodes_per_group();
+    uint32_t inode_size = this->get_superblock().get_inode_size();
+    uint32_t block_size = this->get_superblock().get_block_size();
+    
+    uint32_t itable_blocks = (inodes_per_group * inode_size + block_size - 1) / block_size;
+    
+    for(uint32_t i = 0; i < itable_blocks; ++i) {
+        mark_if_local(inode_table_blk + i);
+    }
+
+    // Marca blocos do Flex_BG
+    for(uint64_t local = 0; local < blocks_per_group; ++local) {
+        if(is_flex_metadata_block(first_block + local)) {
+            Utils::set_bit(bitmap_span, local, 1);
+        }
+    }
+
+    // Preenchimento de segurança para o último grupo (Padding)
+    uint64_t total_blocks = this->get_superblock().get_blocks_count();
+    if(group_end_block > total_blocks) {
+        uint64_t valid_blocks_in_group = (first_block < total_blocks) ? (total_blocks - first_block) : 0;
+        for(uint64_t k = valid_blocks_in_group; k < blocks_per_group; ++k) {
+            Utils::set_bit(bitmap_span, k, 1);
+        }
+    }
+}
+
 void Wrappers::Image::read_offset(const std::streamoff offset, std::span<std::byte> buffer) {
     // Colocamos o cursor na posição (deslocamento) desejado
     this->seek(offset);
@@ -372,6 +477,34 @@ std::vector<uint64_t> Wrappers::Image::get_blocks(const Wrappers::Inode &inode) 
         data_blocks = this->read_blocks_from_index(inode, blocks_span, header);
     }
     return data_blocks;
+}
+
+void Ext4::Wrappers::Image::free_extent_tree(const uint32_t block_id, const uint16_t depth) {
+    // Lê o bloco do disco
+    std::vector<std::byte> buf(this->get_superblock().get_block_size());
+    this->read_block(block_id, Utils::as_byte_span(buf));
+    Raw::ExtentHeader header = Utils::copy<Raw::ExtentHeader>(buf);
+
+    if (depth > 0) {
+        // Nível de Índice: Precisa ler os índices e chamar recursivamente para os filhos
+        auto indices = reinterpret_cast<Raw::ExtentIndex*>(buf.data() + sizeof(Raw::ExtentHeader));
+        for (int i = 0; i < header.eh_entries; ++i) {
+            uint32_t child_block = indices[i].get_leaf_block();
+            this->free_extent_tree(child_block, depth - 1); // Libera o filho primeiro
+        }
+    } else {
+        // Nível de Folha: As folhas já apontam para blocos de dados
+        auto leafs = reinterpret_cast<Raw::ExtentLeaf*>(buf.data() + sizeof(Raw::ExtentHeader));
+        for (int i = 0; i < header.eh_entries; ++i) {
+            // Libera os blocos de dados apontados por esta folha
+            for (int b = 0; b < leafs[i].ee_len; ++b) {
+                this->free_block(leafs[i].get_start_block() + b);
+            }
+        }
+    }
+
+    // Finalmente, libera o próprio bloco de metadados/índice
+    this->free_block(block_id);
 }
 
 std::vector<std::byte> Wrappers::Image::read_file(const Wrappers::Inode &inode) {
@@ -683,28 +816,27 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
     uint32_t new_bitmap_csum = 0;
 
     // Procuramos pelo primeiro grupo de descritores que contém 1 bit desativado em seu bitmap
-    for (size_t i = 0; i < gds.size(); i++) {
+    for(size_t i = 0; i < gds.size(); i++) {
         if(stop) break;
-        if(gds[i].is_block_uninit()) {
-            // O bitmap de blocos deste grupo não está inicializado no disco.
-            // Pulamos para evitar erro de checksum.
-            continue; 
-        }
-
         std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
         auto full_span = Utils::as_byte_span(block_bitmap);
-        this->read_block(gds[i].get_block_bitmap_block(), full_span);
         // Nem sempre o bloco inteiro é de bitmaps, 
         // então dividimos por `blocks_per_group` para descobrir até onde vão os bits válidos
         auto bitmap_span = full_span.subspan(0, this->super_block.get_blocks_per_group() / 8);
 
-        // Checagem de checksums
-        if (this->super_block.has_metadata_csum()) {
-            Checksums::validate_checksum(
-                gds[i].get_block_bitmap_checksum(),
-                Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()),
-                std::format("Checksum para o bitmap de blocos do GDT {}", i)
-            );
+        if(gds[i].is_block_uninit()) {
+            this->init_group_descriptor_block(gds[i].get_group_number(), bitmap_span, Utils::as_span<Wrappers::GroupDescriptor>(gds));
+            this->write_block(gds[i].get_block_bitmap_block(), full_span);
+        } else {
+            this->read_block(gds[i].get_block_bitmap_block(), full_span);
+            // Checagem de checksums
+            if (this->super_block.has_metadata_csum()) {
+                Checksums::validate_checksum(
+                    gds[i].get_block_bitmap_checksum(),
+                    Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()),
+                    std::format("Checksum para o bitmap de blocos do GDT {}", i)
+                );
+            }
         }
 
         for (size_t j = 0; j < bitmap_span.size() * 8; ++j) {
@@ -738,6 +870,10 @@ uint32_t Ext4::Wrappers::Image::alloc_block() {
     uint32_t new_block_count = to_change.get_free_blocks_count() - 1;
     Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
 
+    if(to_change.is_block_uninit()) {
+        new_raw.bg_flags &= ~Ext4::Flags::BG_BLOCK_UNINIT; // limpa o bit da flag
+    }
+
     to_change.set_raw(new_raw);
     this->write_gdt(to_change);
 
@@ -759,24 +895,26 @@ std::pair<uint32_t, uint32_t> Ext4::Wrappers::Image::alloc_contiguous_blocks(con
     uint32_t global_best_len = 0;
 
     // Busca o melhor grupo
-    for (size_t i = 0; i < gds.size(); i++) {
-        if (gds[i].is_block_uninit()) {
-            // O bitmap de blocos deste grupo não está inicializado no disco.
-            // Pulamos para evitar erro de checksum.
-            continue; 
-        }
+    for(size_t i = 0; i < gds.size(); i++) {
         std::vector<std::byte> block_bitmap(this->super_block.get_block_size());
         auto full_span = Utils::as_byte_span(block_bitmap);
-        this->read_block(gds[i].get_block_bitmap_block(), full_span);
+        // Nem sempre o bloco inteiro é de bitmaps, 
+        // então dividimos por `blocks_per_group` para descobrir até onde vão os bits válidos
         auto bitmap_span = full_span.subspan(0, this->super_block.get_blocks_per_group() / 8);
 
-        // Checagem de checksums do bitmap que lemos
-        if (this->super_block.has_metadata_csum()) {
-            Checksums::validate_checksum(
-                gds[i].get_block_bitmap_checksum(),
-                Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()),
-                std::format("Checksum para o bitmap de blocos do GDT {}", i)
-            );
+        if(gds[i].is_block_uninit()) {
+            this->init_group_descriptor_block(gds[i].get_group_number(), bitmap_span, Utils::as_span<Wrappers::GroupDescriptor>(gds));
+            this->write_block(gds[i].get_block_bitmap_block(), full_span);
+        } else {
+            this->read_block(gds[i].get_block_bitmap_block(), full_span);
+            // Checagem de checksums
+            if (this->super_block.has_metadata_csum()) {
+                Checksums::validate_checksum(
+                    gds[i].get_block_bitmap_checksum(),
+                    Checksums::checksum_bitmap(bitmap_span, this->super_block.get_checksum_seed()),
+                    std::format("Checksum para o bitmap de blocos do GDT {}", i)
+                );
+            }
         }
 
         size_t total_bits = bitmap_span.size() * 8;
@@ -842,6 +980,10 @@ std::pair<uint32_t, uint32_t> Ext4::Wrappers::Image::alloc_contiguous_blocks(con
 
     uint32_t new_block_count = to_change.get_free_blocks_count() - global_best_len;
     Utils::split(new_block_count, new_raw.bg_free_blocks_count_lo, new_raw.bg_free_blocks_count_hi);
+
+    if(to_change.is_block_uninit()) {
+        new_raw.bg_flags &= ~Ext4::Flags::BG_BLOCK_UNINIT; // limpa o bit da flag
+    }
     to_change.set_raw(new_raw);
     this->write_gdt(to_change);
 
@@ -1133,8 +1275,6 @@ void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, c
     else if(raw.i_links_count > 0) raw.i_links_count--;
 
     bool should_delete = (raw.i_links_count == 0);
-    std::vector<uint64_t> blocks_to_free;
-    if(should_delete) blocks_to_free = this->get_blocks(inode);  // coleta ANTES de zerar
 
     if(should_delete) {
         raw.i_dtime = static_cast<uint32_t>(std::time(nullptr));
@@ -1146,9 +1286,28 @@ void Ext4::Wrappers::Image::dir_remove_entry(const Wrappers::Inode &dir_inode, c
     inode.set_raw(raw);
     this->write_inode(inode);
 
-    if (should_delete) {
+    if(should_delete) {
         this->free_inode(ino, is_directory);
-        for (const auto &blk : blocks_to_free) this->free_block(blk);
+        // Para liberar os blocos do inode, começaremos o caso recursivo de liberação de blocos
+        std::array<std::byte, 60> buffer = inode.get_i_block();
+        Raw::ExtentHeader header = Utils::copy<Raw::ExtentHeader>(buffer);
+        if(header.eh_depth > 0) {
+            // Estamos na raiz do Inode (depth > 0). 
+            // Os blocos apontados pelos índices são os filhos de profundidade (header.eh_depth - 1).
+            for(uint16_t i = 0; i < header.eh_entries; i++) {
+                Raw::ExtentIndex idx = Utils::copy<Raw::ExtentIndex>(buffer, sizeof(Raw::ExtentHeader) + i * sizeof(Raw::ExtentIndex));
+                // Passamos a profundidade do filho, que é (raiz - 1)
+                this->free_extent_tree(idx.get_leaf_block(), header.eh_depth - 1);
+            }
+        } else {
+            // Profundidade 0: não há índices, apenas folhas (que apontam para dados)
+            for(uint16_t i = 0; i < header.eh_entries; i++) {
+                Raw::ExtentLeaf leaf = Utils::copy<Raw::ExtentLeaf>(buffer, sizeof(Raw::ExtentHeader) + i * sizeof(Raw::ExtentLeaf));
+                for (uint16_t b = 0; b < leaf.ee_len; b++) {
+                    this->free_block(leaf.get_start_block() + b);
+                }
+            }
+        }
     }
 }
 

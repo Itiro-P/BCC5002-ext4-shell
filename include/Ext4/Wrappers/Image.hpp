@@ -38,6 +38,32 @@ namespace Ext4::Wrappers {
          */
         void seek(const std::streamoff offset);
 
+        /**
+         * @brief Checa se o grupo de blocos guarda o backup do superbloco
+         * @param group_num o número do grupo.
+         * @returns `true` se guardar o backup do superbloco e `false` caso contrário.
+         */
+        bool is_superblock_backup(const uint32_t group_num) const;
+
+        /**
+         * @brief Indica se o bloco é reservado seguindo a flag `flex_bg`.
+         * @param block_num o número do bloco.
+         * @returns `true` se o bloco for reservado e `false` caso contrário.
+         */
+        bool is_flex_metadata_block(const uint64_t block_num) const;
+
+        /**
+         * @brief Inicializa o bitmap de blocos do grupo de descritores, garantindo que os blocos reservados e de metadados sejam marcados como ocupados.
+         */
+        void init_group_descriptor_block(const uint32_t group_id, std::span<std::byte> bitmap_span, std::span<Wrappers::GroupDescriptor> gds);
+
+
+        /**
+         * @brief Libera a árvore de extents. Essa é uma função recursiva que percorre a árvore de extents, liberando os blocos alocados para folhas e índices, e atualizando o bitmap de blocos do grupo de descritores.
+         * @param block_id O número do bloco raiz da árvore de extents a ser liberada.
+         * @param depth A profundidade da árvore de extents. Se for 0, significa que o bloco é uma folha; se for maior que 0, significa que o bloco é um índice que aponta para outros blocos de extents.
+         */
+        void free_extent_tree(const uint32_t block_id, const uint16_t depth);
         public:
         /**
          * @brief Construtor que tenta abrir o arquivo de imagem especificado e ler o superbloco para validar a imagem.
@@ -208,7 +234,7 @@ namespace Ext4::Wrappers {
         }
 
         /**
-         * @brief Obtém uma lista de blocos alocados para este Inode. Se o Inode utiliza extents, esta função irá decodificar a estrutura de extents para retornar os blocos físicos. Se o Inode utiliza blocos diretos/indiretos, esta função irá ler os blocos diretos e seguir os ponteiros de blocos indiretos conforme necessário.
+         * @brief Obtém uma lista de blocos alocados para este Inode. Se o Inode utiliza extents, esta função irá decodificar a estrutura de extents para retornar os blocos físicos.
          * @param inode O Inode para o qual os blocos alocados devem ser obtidos.
          * @returns Um vetor de números de blocos alocados para este Inode.
          * @throws `std::runtime_error` se ocorrer um erro ao ler os blocos (por exemplo, se o Inode estiver corrompido ou se houver um erro de leitura do dispositivo).

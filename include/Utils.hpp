@@ -275,7 +275,7 @@ namespace Utils {
      * @param val `true` se forçar ativação. `false` caso contrário.
      */
     inline constexpr void set_bit(std::span<std::byte> bitmap_block, const uint32_t idx, const bool val) {       
-        if (val) reinterpret_cast<uint8_t*>(bitmap_block.data())[idx/8] |= (1 << idx%8);  // Força o bit a virar 1
+        if(val) reinterpret_cast<uint8_t*>(bitmap_block.data())[idx/8] |= (1 << idx%8);  // Força o bit a virar 1
         else reinterpret_cast<uint8_t*>(bitmap_block.data())[idx/8] &= ~(1 << idx%8); // Força o bit a virar 0
     }
 

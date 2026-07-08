@@ -85,6 +85,13 @@ namespace Ext4::Wrappers {
         uint32_t get_inode_generation() const { return this->raw.i_generation; }
 
         /**
+         * @brief Retorna o total de setores alocados para o inode (512B cada caso não haja `large_file`, `huge_file`).
+         */
+        uint64_t get_sectors() const {
+            return (static_cast<uint64_t>(this->raw.i_osd2.l_i_blocks_high) << 32) | this->raw.i_blocks_lo;
+        }
+
+        /**
          * @brief Retorna a estrutura interna do inode.
          */
         Raw::Inode get_raw() const { return raw; }

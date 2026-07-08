@@ -71,6 +71,13 @@ uint32_t build_extent_tree(
                 img.write_block(leafs[i].get_start_block() + j, block_bytes.subspan(file_offset, block_size));
             }
         }
+        // Caso tenhamos checksums
+        if(has_metadata_csum) {
+            Raw::ExtentTail tail{
+                .eb_checksum = Checksums::checksum_extent(inode, buf_bytes, block_size, img.get_superblock().get_checksum_seed())
+            };
+            Utils::write_to(buf_bytes, tail, buf_bytes.size() - sizeof(tail));
+        }
         // Agora (finalmente) escrevemos o bloco com as folhas
         img.write_block(blk_id, buf_bytes);
     } else {
@@ -81,7 +88,7 @@ uint32_t build_extent_tree(
         std::vector<Raw::ExtentIndex> index_entries{};
         size_t leaf_offset = 0;
 
-        while (leaf_offset < leafs.size() && index_entries.size() < max_entries) {
+        while(leaf_offset < leafs.size() && index_entries.size() < max_entries) {
             // Pega o pedaço de folhas que vai pertencer a este filho
             size_t chunk_size = std::min(leafs_per_child, static_cast<uint32_t>(leafs.size() - leaf_offset));
             std::span<Raw::ExtentLeaf> child_leafs = leafs.subspan(leaf_offset, chunk_size);
@@ -93,6 +100,18 @@ uint32_t build_extent_tree(
                 max_per_block, max_per_block, 
                 depth - 1, block_bytes, child_leafs
             );
+
+            if(child_phys_block == 0) {
+                std::println(std::cerr, "Erro: Não foi possível alocar blocos para a árvore de extents.");
+                return 0;
+            } else {
+                // alocamos 1 bloco de índice, então precisamos atualizar o contador de blocos do inode
+                Raw::Inode new_inode = inode.get_raw();
+                uint64_t total_sectors = inode.get_sectors() + (block_size / 512);
+                new_inode.i_blocks_lo = static_cast<uint32_t>(total_sectors & MAX_32BIT);
+                new_inode.i_osd2.l_i_blocks_high = static_cast<uint16_t>((total_sectors >> 32) & MAX_16BIT);   
+                inode.set_raw(new_inode);
+            }
 
             // Criamos o índice apontando para esse filho
             Raw::ExtentIndex idx{
@@ -646,7 +665,7 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
         size_t leaf_offset = 0;
 
         // O loop da raiz roda até processar todas as folhas ou encher o espaço inline do Inode (max_inline = 4)
-        while (leaf_offset < leafs.size() && root_indices.size() < max_inline) {
+        while(leaf_offset < leafs.size() && root_indices.size() < max_inline) {
             size_t chunk_size = std::min(static_cast<size_t>(leafs_per_root_child), leafs.size() - leaf_offset);
             std::span<Raw::ExtentLeaf> child_leafs = leafs_span.subspan(leaf_offset, chunk_size);
 
@@ -656,6 +675,16 @@ short Command::to_in(Image &img, const std::span<const std::string> args) {
                 max_per_block, max_per_block, 
                 depth - 1, Utils::as_byte_span(buffer), child_leafs
             );
+
+            if(child_blk == 0) {
+                std::println(std::cerr, "Erro: Não foi possível alocar blocos para a árvore de extents.");
+                return 1;
+            } else {
+                // alocamos 1 bloco de índice, então precisamos atualizar o contador de blocos do inode
+                total_sectors += (block_size / 512);
+                new_inode.i_blocks_lo = static_cast<uint32_t>(total_sectors & MAX_32BIT);
+                new_inode.i_osd2.l_i_blocks_high = static_cast<uint16_t>((total_sectors >> 32) & MAX_16BIT);   
+            }
 
             // Monta o índice para colocar na raiz (i_block)
             Raw::ExtentIndex idx{
